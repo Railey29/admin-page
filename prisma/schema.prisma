@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model uaa_modules {
+  id               Int              @id @default(autoincrement())
+  submission_id    Int?
+  selected_modules String[]
+  others_text      String?
+  uaa_submissions  uaa_submissions? @relation(fields: [submission_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model uaa_submissions {
+  id                Int                 @id @default(autoincrement())
+  tracking_id       String
+  control_no        String?
+  effective_date    String?
+  office_code       String?
+  submitted_at      DateTime?           @default(now()) @db.Timestamptz(6)
+  status            String?             @default("Pending")
+  approved_by_l1    Boolean?            @default(false)
+  approved_by_l2    Boolean?            @default(false)
+  approved_by_l3    Boolean?            @default(false)
+  approved_by_l4    Boolean?            @default(false)
+  uaa_modules       uaa_modules[]
+  uaa_system_access uaa_system_access[]
+  uaa_user_info     uaa_user_info[]
+}
+
+model uaa_system_access {
+  id               Int              @id @default(autoincrement())
+  submission_id    Int?
+  account_type     String?
+  existing_sub     String?
+  from_office_code String?
+  to_office_code   String?
+  user_type        String?
+  login_mode       String?
+  uaa_submissions  uaa_submissions? @relation(fields: [submission_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model uaa_user_info {
+  id              Int              @id @default(autoincrement())
+  submission_id   Int?
+  last_name       String?
+  first_name      String?
+  middle_name     String?
+  designation     String?
+  employee_id     String?
+  contact_no      String?
+  email           String?
+  uaa_submissions uaa_submissions? @relation(fields: [submission_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
