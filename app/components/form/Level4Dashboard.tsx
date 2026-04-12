@@ -2,6 +2,8 @@
 import { useState } from "react";
 import { AdminCredential } from "../../models/authModel";
 import { useSubmissions, SubmissionRecord } from "../../hooks/useSubmissions";
+import { EmailPayload } from "../../models/emailModel";
+import ExportButtons from "../ui/ExportButtons";
 
 interface Props {
   admin: AdminCredential;
@@ -10,26 +12,92 @@ interface Props {
 
 type Tab = "toProcess" | "done" | "issues";
 
+async function sendStatusEmail(payload: EmailPayload) {
+  try {
+    await fetch("/api/send-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    console.error("[Level4Dashboard] Failed to send email:", err);
+  }
+}
+
 export default function Level4Dashboard({ admin, onLogout }: Props) {
   const [tab, setTab] = useState<Tab>("toProcess");
   const [viewModal, setViewModal] = useState<SubmissionRecord | null>(null);
+  const [commentModal, setCommentModal] = useState<{
+    record: SubmissionRecord;
+    action: "done" | "issue";
+  } | null>(null);
+  const [comment, setComment] = useState("");
+  const [sending, setSending] = useState(false);
 
   const { submissions, loading, approve, reject } = useSubmissions(4);
 
+  // ── Approval chain: L1 solo → L2 OR L3 (shared gate, first wins) → L4
+  //
+  // A record is ready for L4 when:
+  //   - not rejected
+  //   - L1 approved
+  //   - at least one of L2 or L3 approved (shared gate closed)
+  //   - L4 hasn't processed it yet
+  //
   const toProcess = submissions.filter(
-    (r) => r.approved_by_l3 && !r.approved_by_l4 && r.status !== "Rejected",
+    (r) =>
+      r.status !== "Rejected" &&
+      r.approved_by_l1 &&
+      (r.approved_by_l2 || r.approved_by_l3) &&
+      !r.approved_by_l4,
   );
+
   const done = submissions.filter((r) => r.approved_by_l4);
   const issues = submissions.filter((r) => r.status === "Rejected");
 
-  const handleProcess = async (id: number) => {
-    await approve(id);
+  const openCommentModal = (
+    record: SubmissionRecord,
+    action: "done" | "issue",
+  ) => {
+    setComment("");
+    setCommentModal({ record, action });
     setViewModal(null);
   };
 
-  const handleIssue = async (id: number) => {
-    await reject(id);
-    setViewModal(null);
+  const handleConfirm = async () => {
+    if (!commentModal) return;
+    const { record, action } = commentModal;
+
+    const userInfo = record.uaa_user_info[0];
+    const fullName = userInfo
+      ? `${userInfo.last_name}, ${userInfo.first_name} ${userInfo.middle_name ?? ""}`.trim()
+      : "Applicant";
+
+    setSending(true);
+    try {
+      if (action === "done") {
+        await approve(record.id);
+        await sendStatusEmail({
+          to: userInfo?.email ?? "",
+          applicantName: fullName,
+          trackingId: record.tracking_id,
+          status: "Processed",
+          comment: comment.trim() || undefined,
+        });
+      } else {
+        await reject(record.id);
+        await sendStatusEmail({
+          to: userInfo?.email ?? "",
+          applicantName: fullName,
+          trackingId: record.tracking_id,
+          status: "Rejected",
+          comment: comment.trim() || undefined,
+        });
+      }
+    } finally {
+      setSending(false);
+      setCommentModal(null);
+    }
   };
 
   const currentList =
@@ -185,29 +253,38 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
               borderBottom: "1px solid #f3f4f6",
               display: "flex",
               alignItems: "center",
+              justifyContent: "space-between",
               gap: 8,
             }}
           >
-            <span style={{ fontWeight: 600, color: "#111827" }}>
-              {tab === "toProcess" && "📋 Requests to Process"}
-              {tab === "done" && "✅ Processed Requests"}
-              {tab === "issues" && "❌ Rejected / Issues"}
-            </span>
-            {tab === "toProcess" && toProcess.length > 0 && (
-              <span
-                style={{
-                  fontSize: "0.7rem",
-                  backgroundColor: "#ffedd5",
-                  color: "#c2410c",
-                  fontWeight: 700,
-                  padding: "2px 8px",
-                  borderRadius: 999,
-                }}
-              >
-                {toProcess.length}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontWeight: 600, color: "#111827" }}>
+                {tab === "toProcess" && "📋 Requests to Process"}
+                {tab === "done" && "✅ Processed Requests"}
+                {tab === "issues" && "❌ Rejected / Issues"}
               </span>
-            )}
+              {tab === "toProcess" && toProcess.length > 0 && (
+                <span
+                  style={{
+                    fontSize: "0.7rem",
+                    backgroundColor: "#ffedd5",
+                    color: "#c2410c",
+                    fontWeight: 700,
+                    padding: "2px 8px",
+                    borderRadius: 999,
+                  }}
+                >
+                  {toProcess.length}
+                </span>
+              )}
+            </div>
+            <ExportButtons
+              records={currentList}
+              filename={`l4-${tab}`}
+              pdfTitle={`Level 4 — ${tab === "toProcess" ? "To Process" : tab === "done" ? "Processed" : "Issues"}`}
+            />
           </div>
+
           {tab === "toProcess" && (
             <div
               style={{
@@ -217,8 +294,8 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                 borderBottom: "1px solid #f9fafb",
               }}
             >
-              These requests have been fully approved and are now waiting to be
-              processed.
+              Approved by Level 1 and at least one of Level 2 or Level 3 — ready
+              for implementation.
             </div>
           )}
 
@@ -372,13 +449,13 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                           {tab === "toProcess" && (
                             <>
                               <ActionBtn
-                                onClick={() => handleProcess(req.id)}
+                                onClick={() => openCommentModal(req, "done")}
                                 color="#16a34a"
                                 borderColor="#4ade80"
                                 label="✅ Mark Done"
                               />
                               <ActionBtn
-                                onClick={() => handleIssue(req.id)}
+                                onClick={() => openCommentModal(req, "issue")}
                                 color="#ef4444"
                                 borderColor="#f87171"
                                 label="❌ Flag Issue"
@@ -436,8 +513,9 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
           <span
             style={{ fontSize: "0.75rem", color: "#1d4ed8", fontWeight: 500 }}
           >
-            ℹ️ As Level 4 Implementor, you process requests that have been fully
-            approved by all three approval levels.
+            ℹ️ As Level 4 Implementor, you receive requests once Level 1 and at
+            least one of Level 2 or Level 3 have approved. An email notification
+            is sent to the applicant after each action.
           </span>
         </div>
       </main>
@@ -541,6 +619,8 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                         value={modules.selected_modules.join(", ")}
                       />
                     )}
+
+                    {/* Approval chain */}
                     <div
                       style={{
                         borderTop: "1px solid #f3f4f6",
@@ -560,63 +640,48 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                       >
                         Approval Chain
                       </div>
-                      {[
-                        { lvl: 1, approved: viewModal.approved_by_l1 },
-                        { lvl: 2, approved: viewModal.approved_by_l2 },
-                        { lvl: 3, approved: viewModal.approved_by_l3 },
-                        { lvl: 4, approved: viewModal.approved_by_l4 },
-                      ].map(({ lvl, approved }) => {
-                        const isRejected = viewModal.status === "Rejected";
-                        const color = isRejected
-                          ? "#ef4444"
-                          : approved
-                            ? "#16a34a"
-                            : "#9ca3af";
-                        const bg = isRejected
-                          ? "#fee2e2"
-                          : approved
-                            ? "#dcfce7"
-                            : "#f3f4f6";
-                        const label = isRejected
-                          ? "Rejected"
-                          : approved
-                            ? "Approved"
-                            : "Pending";
-                        return (
-                          <div
-                            key={lvl}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 8,
-                              marginBottom: 6,
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: "0.75rem",
-                                color: "#9ca3af",
-                                width: 110,
-                              }}
-                            >
-                              Level {lvl}
-                              {lvl === 4 ? " (Impl.)" : ""}:
-                            </span>
-                            <span
-                              style={{
-                                fontSize: "0.75rem",
-                                fontWeight: 500,
-                                padding: "2px 10px",
-                                borderRadius: 999,
-                                backgroundColor: bg,
-                                color,
-                              }}
-                            >
-                              {label}
-                            </span>
-                          </div>
-                        );
-                      })}
+
+                      <ApprovalRow
+                        label="Level 1 Approver"
+                        approved={viewModal.approved_by_l1}
+                        isRejected={viewModal.status === "Rejected"}
+                      />
+
+                      {/* L2/L3 shared gate */}
+                      <div
+                        style={{
+                          border: "1px dashed #bfdbfe",
+                          borderRadius: 8,
+                          padding: "8px 10px",
+                          marginBottom: 6,
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: "0.68rem",
+                            color: "#93c5fd",
+                            marginBottom: 6,
+                          }}
+                        >
+                          Shared gate — either Level 2 or 3
+                        </div>
+                        <ApprovalRow
+                          label="Level 2"
+                          approved={viewModal.approved_by_l2}
+                          isRejected={viewModal.status === "Rejected"}
+                        />
+                        <ApprovalRow
+                          label="Level 3"
+                          approved={viewModal.approved_by_l3}
+                          isRejected={viewModal.status === "Rejected"}
+                        />
+                      </div>
+
+                      <ApprovalRow
+                        label="Level 4 (Implementor)"
+                        approved={viewModal.approved_by_l4}
+                        isRejected={viewModal.status === "Rejected"}
+                      />
                     </div>
                   </>
                 );
@@ -635,7 +700,7 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
               {tab === "toProcess" && (
                 <>
                   <button
-                    onClick={() => handleIssue(viewModal.id)}
+                    onClick={() => openCommentModal(viewModal, "issue")}
                     style={{
                       fontSize: "0.875rem",
                       padding: "8px 16px",
@@ -649,7 +714,7 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                     ❌ Flag Issue
                   </button>
                   <button
-                    onClick={() => handleProcess(viewModal.id)}
+                    onClick={() => openCommentModal(viewModal, "done")}
                     style={{
                       fontSize: "0.875rem",
                       padding: "8px 16px",
@@ -681,6 +746,236 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
           </div>
         </div>
       )}
+
+      {/* ── COMMENT MODAL ── */}
+      {commentModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(0,0,0,0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 60,
+            padding: 16,
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#fff",
+              borderRadius: 16,
+              boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+              width: "100%",
+              maxWidth: 460,
+            }}
+          >
+            <div
+              style={{
+                padding: "16px 24px",
+                borderBottom: "1px solid #f3f4f6",
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+              }}
+            >
+              <span style={{ fontSize: "1.2rem" }}>
+                {commentModal.action === "done" ? "✅" : "❌"}
+              </span>
+              <span style={{ fontWeight: 700, color: "#111827" }}>
+                {commentModal.action === "done"
+                  ? "Mark as Processed"
+                  : "Flag as Issue / Reject"}
+              </span>
+            </div>
+
+            <div style={{ padding: "20px 24px" }}>
+              {(() => {
+                const userInfo = commentModal.record.uaa_user_info[0];
+                const fullName = userInfo
+                  ? `${userInfo.last_name}, ${userInfo.first_name}`.trim()
+                  : "—";
+                return (
+                  <div
+                    style={{
+                      backgroundColor: "#f9fafb",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 8,
+                      padding: "10px 14px",
+                      marginBottom: 16,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: "0.7rem",
+                        color: "#9ca3af",
+                        marginBottom: 2,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
+                      }}
+                    >
+                      Applicant
+                    </div>
+                    <div style={{ fontWeight: 600, color: "#111827" }}>
+                      {fullName}
+                    </div>
+                    <div style={{ fontSize: "0.75rem", color: "#6b7280" }}>
+                      {commentModal.record.tracking_id}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <label
+                style={{
+                  fontSize: "0.8rem",
+                  fontWeight: 600,
+                  color: "#374151",
+                  display: "block",
+                  marginBottom: 6,
+                }}
+              >
+                {commentModal.action === "issue"
+                  ? "Reason / Comment *"
+                  : "Comment (optional)"}
+              </label>
+              <textarea
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                rows={4}
+                placeholder={
+                  commentModal.action === "issue"
+                    ? "Describe the issue or reason for rejection..."
+                    : "Add an optional message for the applicant..."
+                }
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  border: `1px solid ${commentModal.action === "issue" && !comment.trim() ? "#fca5a5" : "#d1d5db"}`,
+                  borderRadius: 8,
+                  fontSize: "0.875rem",
+                  color: "#111827",
+                  resize: "vertical",
+                  outline: "none",
+                  fontFamily: "system-ui, sans-serif",
+                  boxSizing: "border-box",
+                }}
+              />
+              <div
+                style={{
+                  marginTop: 10,
+                  display: "flex",
+                  gap: 6,
+                  alignItems: "flex-start",
+                }}
+              >
+                <span style={{ fontSize: "0.8rem" }}>📧</span>
+                <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>
+                  An email notification will be sent to the applicant's
+                  registered email address.
+                </span>
+              </div>
+            </div>
+
+            <div
+              style={{
+                padding: "12px 24px",
+                backgroundColor: "#f9fafb",
+                borderRadius: "0 0 16px 16px",
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 8,
+              }}
+            >
+              <button
+                onClick={() => setCommentModal(null)}
+                disabled={sending}
+                style={{
+                  fontSize: "0.875rem",
+                  padding: "8px 16px",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  background: "#fff",
+                  color: "#6b7280",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirm}
+                disabled={
+                  sending ||
+                  (commentModal.action === "issue" && !comment.trim())
+                }
+                style={{
+                  fontSize: "0.875rem",
+                  padding: "8px 20px",
+                  border: "none",
+                  borderRadius: 8,
+                  cursor:
+                    sending ||
+                    (commentModal.action === "issue" && !comment.trim())
+                      ? "not-allowed"
+                      : "pointer",
+                  background:
+                    commentModal.action === "done" ? "#16a34a" : "#ef4444",
+                  color: "#fff",
+                  fontWeight: 600,
+                  opacity:
+                    sending ||
+                    (commentModal.action === "issue" && !comment.trim())
+                      ? 0.6
+                      : 1,
+                }}
+              >
+                {sending
+                  ? "Sending..."
+                  : commentModal.action === "done"
+                    ? "✅ Confirm & Notify"
+                    : "❌ Reject & Notify"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Sub-components ─────────────────────────────────────────────────────
+
+function ApprovalRow({
+  label,
+  approved,
+  isRejected,
+}: {
+  label: string;
+  approved: boolean | null | undefined;
+  isRejected: boolean;
+}) {
+  const color = isRejected ? "#ef4444" : approved ? "#16a34a" : "#9ca3af";
+  const bg = isRejected ? "#fee2e2" : approved ? "#dcfce7" : "#f3f4f6";
+  const lbl = isRejected ? "Rejected" : approved ? "Approved" : "Pending";
+  return (
+    <div
+      style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}
+    >
+      <span style={{ fontSize: "0.75rem", color: "#9ca3af", width: 140 }}>
+        {label}:
+      </span>
+      <span
+        style={{
+          fontSize: "0.75rem",
+          fontWeight: 500,
+          padding: "2px 10px",
+          borderRadius: 999,
+          backgroundColor: bg,
+          color,
+        }}
+      >
+        {lbl}
+      </span>
     </div>
   );
 }

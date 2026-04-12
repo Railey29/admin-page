@@ -3,9 +3,10 @@ import { useState } from "react";
 
 interface LoginPageProps {
   onLogin: (username: string, password: string) => boolean;
+  onRegister?: () => void;
 }
 
-export default function LoginPage({ onLogin }: LoginPageProps) {
+export default function LoginPage({ onLogin, onRegister }: LoginPageProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -201,15 +202,32 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           </button>
         </form>
 
+        {/* Register link */}
         <p
           style={{
             textAlign: "center",
             color: "#9ca3af",
             fontSize: "0.75rem",
-            marginTop: "16px",
+            marginTop: "20px",
           }}
         >
-          ← Back to submission form
+          Don&apos;t have an account?{" "}
+          <button
+            onClick={onRegister}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#1e3a8a",
+              fontWeight: 600,
+              fontSize: "0.75rem",
+              cursor: "pointer",
+              padding: 0,
+              textDecoration: "underline",
+              textUnderlineOffset: "2px",
+            }}
+          >
+            Register
+          </button>
         </p>
       </div>
     </div>
