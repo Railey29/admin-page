@@ -36,14 +36,6 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
 
   const { submissions, loading, approve, reject } = useSubmissions(4);
 
-  // ── Approval chain: L1 solo → L2 OR L3 (shared gate, first wins) → L4
-  //
-  // A record is ready for L4 when:
-  //   - not rejected
-  //   - L1 approved
-  //   - at least one of L2 or L3 approved (shared gate closed)
-  //   - L4 hasn't processed it yet
-  //
   const toProcess = submissions.filter(
     (r) =>
       r.status !== "Rejected" &&
@@ -526,7 +518,7 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
           style={{
             position: "fixed",
             inset: 0,
-            backgroundColor: "rgba(0,0,0,0.4)",
+            backgroundColor: "rgba(0,0,0,0.5)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -537,212 +529,390 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
           <div
             style={{
               backgroundColor: "#fff",
-              borderRadius: 16,
-              boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+              borderRadius: 12,
+              boxShadow: "0 24px 64px rgba(0,0,0,0.25)",
               width: "100%",
-              maxWidth: 500,
+              maxWidth: 680,
+              maxHeight: "90vh",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
             }}
           >
-            <div
-              style={{
-                padding: "16px 24px",
-                borderBottom: "1px solid #f3f4f6",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <span style={{ fontWeight: 700, color: "#111827" }}>
-                Request Details
-              </span>
-              <button
-                onClick={() => setViewModal(null)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  fontSize: "1.25rem",
-                  cursor: "pointer",
-                  color: "#9ca3af",
-                }}
-              >
-                ×
-              </button>
-            </div>
-            <div style={{ padding: "20px 24px" }}>
-              {(() => {
-                const userInfo = viewModal.uaa_user_info[0];
-                const sysAccess = viewModal.uaa_system_access[0];
-                const modules = viewModal.uaa_modules[0];
-                const fullName = userInfo
-                  ? `${userInfo.last_name}, ${userInfo.first_name} ${userInfo.middle_name ?? ""}`.trim()
-                  : "—";
-                return (
-                  <>
-                    <ModalRow
-                      label="Tracking ID"
-                      value={viewModal.tracking_id}
-                    />
-                    <ModalRow label="Applicant" value={fullName} />
-                    <ModalRow
-                      label="Position"
-                      value={`${userInfo?.designation ?? "—"} • ${userInfo?.employee_id ?? "—"}`}
-                    />
-                    <ModalRow
-                      label="Office Code"
-                      value={viewModal.office_code ?? "—"}
-                    />
-                    <ModalRow
-                      label="Account Type"
-                      value={sysAccess?.account_type ?? "—"}
-                    />
-                    <ModalRow
-                      label="User Type"
-                      value={sysAccess?.user_type ?? "—"}
-                    />
-                    <ModalRow
-                      label="Login Mode"
-                      value={sysAccess?.login_mode ?? "—"}
-                    />
-                    <ModalRow
-                      label="Date Submitted"
-                      value={
-                        viewModal.submitted_at
-                          ? new Date(
-                              viewModal.submitted_at,
-                            ).toLocaleDateString()
-                          : "—"
-                      }
-                    />
-                    {modules?.selected_modules?.length > 0 && (
-                      <ModalRow
-                        label="Modules"
-                        value={modules.selected_modules.join(", ")}
-                      />
-                    )}
+            {(() => {
+              const userInfo = viewModal.uaa_user_info[0];
+              const sysAccess = viewModal.uaa_system_access[0];
+              const modules = viewModal.uaa_modules[0];
+              const fullName = userInfo
+                ? `${userInfo.last_name}, ${userInfo.first_name} ${userInfo.middle_name ?? ""}`.trim()
+                : "Applicant";
+              const moduleList = modules?.selected_modules ?? [];
+              const isRejected = viewModal.status === "Rejected";
 
-                    {/* Approval chain */}
+              const approvalSteps = [
+                {
+                  label: "Level 1 — Chief of Office",
+                  approved: viewModal.approved_by_l1,
+                },
+                { label: "Level 2", approved: viewModal.approved_by_l2 },
+                { label: "Level 3", approved: viewModal.approved_by_l3 },
+                {
+                  label: "Level 4 (Implementor)",
+                  approved: viewModal.approved_by_l4,
+                },
+              ];
+
+              return (
+                <>
+                  {/* Dark blue header */}
+                  <div
+                    style={{
+                      backgroundColor: "#1e3a8a",
+                      color: "#fff",
+                      padding: "16px 24px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      flexShrink: 0,
+                    }}
+                  >
                     <div
+                      style={{ display: "flex", alignItems: "center", gap: 10 }}
+                    >
+                      <span style={{ fontSize: "1rem" }}>📄</span>
+                      <span style={{ fontWeight: 700, fontSize: "0.95rem" }}>
+                        Application — {fullName}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setViewModal(null)}
                       style={{
-                        borderTop: "1px solid #f3f4f6",
-                        marginTop: 12,
-                        paddingTop: 12,
+                        background: "rgba(255,255,255,0.15)",
+                        border: "none",
+                        color: "#fff",
+                        width: 28,
+                        height: 28,
+                        borderRadius: "50%",
+                        cursor: "pointer",
+                        fontSize: "1.1rem",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontWeight: 700,
+                        lineHeight: 1,
                       }}
                     >
-                      <div
-                        style={{
-                          fontSize: "0.7rem",
-                          fontWeight: 600,
-                          color: "#6b7280",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.05em",
-                          marginBottom: 8,
-                        }}
-                      >
-                        Approval Chain
-                      </div>
+                      ×
+                    </button>
+                  </div>
 
-                      <ApprovalRow
-                        label="Level 1 Approver"
-                        approved={viewModal.approved_by_l1}
-                        isRejected={viewModal.status === "Rejected"}
+                  {/* Scrollable body */}
+                  <div
+                    style={{ overflowY: "auto", flex: 1, padding: "20px 24px" }}
+                  >
+                    {/* DOCUMENT INFO */}
+                    <SectionHeader label="DOCUMENT INFO" />
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: "12px 24px",
+                        marginBottom: 20,
+                      }}
+                    >
+                      <FieldBlock
+                        label="CONTROL NO."
+                        value={viewModal.tracking_id}
                       />
-
-                      {/* L2/L3 shared gate */}
-                      <div
-                        style={{
-                          border: "1px dashed #bfdbfe",
-                          borderRadius: 8,
-                          padding: "8px 10px",
-                          marginBottom: 6,
-                        }}
-                      >
-                        <div
-                          style={{
-                            fontSize: "0.68rem",
-                            color: "#93c5fd",
-                            marginBottom: 6,
-                          }}
-                        >
-                          Shared gate — either Level 2 or 3
-                        </div>
-                        <ApprovalRow
-                          label="Level 2"
-                          approved={viewModal.approved_by_l2}
-                          isRejected={viewModal.status === "Rejected"}
-                        />
-                        <ApprovalRow
-                          label="Level 3"
-                          approved={viewModal.approved_by_l3}
-                          isRejected={viewModal.status === "Rejected"}
-                        />
-                      </div>
-
-                      <ApprovalRow
-                        label="Level 4 (Implementor)"
-                        approved={viewModal.approved_by_l4}
-                        isRejected={viewModal.status === "Rejected"}
+                      <FieldBlock
+                        label="EFFECTIVE DATE"
+                        value={
+                          viewModal.submitted_at
+                            ? new Date(
+                                viewModal.submitted_at,
+                              ).toLocaleDateString("en-CA")
+                            : "—"
+                        }
+                      />
+                      <FieldBlock
+                        label="OFFICE CODE"
+                        value={viewModal.office_code ?? "—"}
+                      />
+                      <FieldBlock
+                        label="DATE SUBMITTED"
+                        value={
+                          viewModal.submitted_at
+                            ? new Date(
+                                viewModal.submitted_at,
+                              ).toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })
+                            : "—"
+                        }
                       />
                     </div>
-                  </>
-                );
-              })()}
-            </div>
-            <div
-              style={{
-                padding: "12px 24px",
-                backgroundColor: "#f9fafb",
-                borderRadius: "0 0 16px 16px",
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: 8,
-              }}
-            >
-              {tab === "toProcess" && (
-                <>
-                  <button
-                    onClick={() => openCommentModal(viewModal, "issue")}
+
+                    {/* I. SYSTEM ACCESS */}
+                    <SectionHeader label="I. SYSTEM ACCESS" />
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: "12px 24px",
+                        marginBottom: 20,
+                      }}
+                    >
+                      <FieldBlock
+                        label="ACCOUNT ACTION"
+                        value={sysAccess?.account_type ?? "—"}
+                      />
+                      <FieldBlock
+                        label="SUB-ACTION"
+                        value={sysAccess?.existing_sub ?? "—"}
+                      />
+                      <FieldBlock
+                        label="USER TYPE"
+                        value={sysAccess?.user_type ?? "—"}
+                      />
+                      <FieldBlock
+                        label="LOGIN MODE"
+                        value={sysAccess?.login_mode ?? "—"}
+                      />
+                    </div>
+
+                    {/* II. USER INFORMATION */}
+                    <SectionHeader label="II. USER INFORMATION" />
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: "12px 24px",
+                        marginBottom: 20,
+                      }}
+                    >
+                      <FieldBlock
+                        label="LAST NAME"
+                        value={userInfo?.last_name ?? "—"}
+                      />
+                      <FieldBlock
+                        label="FIRST NAME"
+                        value={userInfo?.first_name ?? "—"}
+                      />
+                      <FieldBlock
+                        label="MIDDLE NAME"
+                        value={userInfo?.middle_name ?? "—"}
+                      />
+                      <FieldBlock
+                        label="DESIGNATION"
+                        value={userInfo?.designation ?? "—"}
+                      />
+                      <FieldBlock
+                        label="EMPLOYEE ID"
+                        value={userInfo?.employee_id ?? "—"}
+                      />
+                      <FieldBlock
+                        label="CONTACT NO."
+                        value={userInfo?.contact_no ?? "—"}
+                      />
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <FieldBlock
+                          label="EMAIL"
+                          value={userInfo?.email ?? "—"}
+                        />
+                      </div>
+                    </div>
+
+                    {/* III. MODULES */}
+                    {moduleList.length > 0 && (
+                      <>
+                        <SectionHeader label="III. MODULES" />
+                        <div
+                          style={{
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: 8,
+                            marginBottom: 20,
+                          }}
+                        >
+                          {moduleList.map((mod: string, i: number) => (
+                            <span
+                              key={i}
+                              style={{
+                                fontSize: "0.75rem",
+                                backgroundColor: "#eff6ff",
+                                color: "#1d4ed8",
+                                border: "1px solid #bfdbfe",
+                                padding: "4px 12px",
+                                borderRadius: 999,
+                                fontWeight: 500,
+                              }}
+                            >
+                              {mod}
+                            </span>
+                          ))}
+                        </div>
+                      </>
+                    )}
+
+                    {/* IV. APPROVAL TRAIL */}
+                    <SectionHeader label="IV. APPROVAL TRAIL" />
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 8,
+                        marginBottom: 8,
+                      }}
+                    >
+                      {approvalSteps.map((step, i) => {
+                        const approved = step.approved;
+                        const dotColor = isRejected
+                          ? "#ef4444"
+                          : approved
+                            ? "#16a34a"
+                            : "#d1d5db";
+                        const statusLabel = isRejected
+                          ? "Rejected"
+                          : approved
+                            ? "Approved"
+                            : "Waiting";
+                        const statusIcon = isRejected
+                          ? "❌"
+                          : approved
+                            ? "✅"
+                            : "⏳";
+                        const statusColor = isRejected
+                          ? "#ef4444"
+                          : approved
+                            ? "#16a34a"
+                            : "#9ca3af";
+
+                        return (
+                          <div
+                            key={i}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 12,
+                              backgroundColor: "#f9fafb",
+                              border: "1px solid #f3f4f6",
+                              borderRadius: 8,
+                              padding: "10px 14px",
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: 10,
+                                height: 10,
+                                borderRadius: "50%",
+                                backgroundColor: dotColor,
+                                flexShrink: 0,
+                              }}
+                            />
+                            <span
+                              style={{
+                                fontSize: "0.875rem",
+                                color: "#374151",
+                                flex: 1,
+                              }}
+                            >
+                              {step.label}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: "0.75rem",
+                                color: statusColor,
+                                fontWeight: 500,
+                              }}
+                            >
+                              {statusIcon} {statusLabel}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Footer actions */}
+                  <div
                     style={{
-                      fontSize: "0.875rem",
-                      padding: "8px 16px",
-                      border: "1px solid #f87171",
-                      borderRadius: 8,
-                      cursor: "pointer",
-                      background: "#fff",
-                      color: "#ef4444",
+                      padding: "12px 24px",
+                      borderTop: "1px solid #e5e7eb",
+                      display: "flex",
+                      gap: 8,
+                      justifyContent: "flex-end",
+                      flexShrink: 0,
+                      backgroundColor: "#fff",
                     }}
                   >
-                    ❌ Flag Issue
-                  </button>
-                  <button
-                    onClick={() => openCommentModal(viewModal, "done")}
-                    style={{
-                      fontSize: "0.875rem",
-                      padding: "8px 16px",
-                      border: "1px solid #4ade80",
-                      borderRadius: 8,
-                      cursor: "pointer",
-                      background: "#fff",
-                      color: "#16a34a",
-                    }}
-                  >
-                    ✅ Mark Done
-                  </button>
+                    {tab === "toProcess" && (
+                      <>
+                        <button
+                          onClick={() => openCommentModal(viewModal, "done")}
+                          style={{
+                            fontSize: "0.875rem",
+                            padding: "8px 18px",
+                            border: "none",
+                            borderRadius: 8,
+                            cursor: "pointer",
+                            background: "#16a34a",
+                            color: "#fff",
+                            fontWeight: 600,
+                          }}
+                        >
+                          ✅ Approve
+                        </button>
+                        <button
+                          onClick={() => openCommentModal(viewModal, "issue")}
+                          style={{
+                            fontSize: "0.875rem",
+                            padding: "8px 18px",
+                            border: "none",
+                            borderRadius: 8,
+                            cursor: "pointer",
+                            background: "#ef4444",
+                            color: "#fff",
+                            fontWeight: 600,
+                          }}
+                        >
+                          ✕ Reject
+                        </button>
+                      </>
+                    )}
+                    <button
+                      style={{
+                        fontSize: "0.875rem",
+                        padding: "8px 18px",
+                        border: "1px solid #fbbf24",
+                        borderRadius: 8,
+                        cursor: "pointer",
+                        background: "#fff",
+                        color: "#92400e",
+                        fontWeight: 500,
+                      }}
+                    >
+                      🖨 Export PDF
+                    </button>
+                    <button
+                      onClick={() => setViewModal(null)}
+                      style={{
+                        fontSize: "0.875rem",
+                        padding: "8px 18px",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: 8,
+                        cursor: "pointer",
+                        background: "#fff",
+                        color: "#6b7280",
+                      }}
+                    >
+                      Close
+                    </button>
+                  </div>
                 </>
-              )}
-              <button
-                onClick={() => setViewModal(null)}
-                style={{
-                  fontSize: "0.875rem",
-                  padding: "8px 16px",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 8,
-                  cursor: "pointer",
-                  background: "#fff",
-                }}
-              >
-                Close
-              </button>
-            </div>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -871,7 +1041,7 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
               >
                 <span style={{ fontSize: "0.8rem" }}>📧</span>
                 <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>
-                  An email notification will be sent to the applicant's
+                  An email notification will be sent to the applicant&apos;s
                   registered email address.
                 </span>
               </div>
@@ -944,6 +1114,62 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────
+
+function SectionHeader({ label }: { label: string }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 12,
+      }}
+    >
+      <div
+        style={{
+          width: 3,
+          height: 16,
+          backgroundColor: "#1e3a8a",
+          borderRadius: 2,
+          flexShrink: 0,
+        }}
+      />
+      <span
+        style={{
+          fontSize: "0.7rem",
+          fontWeight: 700,
+          color: "#1e3a8a",
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+        }}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function FieldBlock({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div
+        style={{
+          fontSize: "0.65rem",
+          fontWeight: 600,
+          color: "#9ca3af",
+          letterSpacing: "0.06em",
+          textTransform: "uppercase",
+          marginBottom: 3,
+        }}
+      >
+        {label}
+      </div>
+      <div style={{ fontSize: "0.9rem", color: "#111827", fontWeight: 500 }}>
+        {value}
+      </div>
+    </div>
+  );
+}
 
 function ApprovalRow({
   label,

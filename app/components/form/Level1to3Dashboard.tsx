@@ -22,20 +22,10 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
     admin.level,
   );
 
-  // ── Pending logic per level ─────────────────────────────────────────
-  //
-  // Level 1 : no one has approved L1 yet, and not rejected
-  // Level 2 : L1 approved, AND neither L2 nor L3 has acted yet (first wins)
-  // Level 3 : same as Level 2 (shared gate — either L2 or L3 can close it)
-  //
   const pendingForMe = submissions.filter((s) => {
     if (s.status === "Rejected") return false;
-    if (admin.level === 1) {
-      return !s.approved_by_l1;
-    }
+    if (admin.level === 1) return !s.approved_by_l1;
     if (admin.level === 2 || admin.level === 3) {
-      // L1 must have approved, AND the L2/L3 gate must still be open
-      // (neither has acted → approved_by_l2 and approved_by_l3 are both falsy)
       return (
         s.approved_by_l1 &&
         !s.approved_by_l2 &&
@@ -63,7 +53,6 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
     allTime: "All Time",
   };
 
-  // ── Filter submissions for export ───────────────────────────────────
   const now = new Date();
   const filteredSubmissions = submissions.filter((s) => {
     if (!s.submitted_at || filter === "allTime") return true;
@@ -79,17 +68,10 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
         d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
       );
     }
-    if (filter === "thisYear") {
-      return d.getFullYear() === now.getFullYear();
-    }
+    if (filter === "thisYear") return d.getFullYear() === now.getFullYear();
     return true;
   });
 
-  // ── Helpers for modal action button visibility ──────────────────────
-  //
-  // For L1: show buttons only if L1 hasn't acted yet
-  // For L2/L3: show buttons only if L1 approved AND the shared gate is still open
-  //
   const canActOnRecord = (record: SubmissionRecord): boolean => {
     if (record.status === "Rejected") return false;
     if (admin.level === 1) return !record.approved_by_l1;
@@ -101,6 +83,65 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
       );
     }
     return false;
+  };
+
+  const handleExportPDF = (record: SubmissionRecord) => {
+    const userInfo = record.uaa_user_info[0];
+    const sysAccess = record.uaa_system_access[0];
+    const modules = record.uaa_modules[0];
+    const fullName = userInfo
+      ? `${userInfo.last_name}, ${userInfo.first_name} ${userInfo.middle_name ?? ""}`.trim()
+      : "—";
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(`<html><head><title>Application — ${fullName}</title>
+      <style>
+        body{font-family:Arial,sans-serif;padding:32px;color:#111;font-size:13px;}
+        h2{color:#1e3a8a;margin-bottom:4px;}
+        .st{font-size:11px;font-weight:700;color:#1e3a8a;text-transform:uppercase;letter-spacing:.08em;border-left:3px solid #1e3a8a;padding-left:8px;margin:20px 0 10px;}
+        .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 24px;margin-bottom:8px;}
+        .fl{font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;}
+        .fv{font-size:13px;font-weight:600;color:#111;margin-top:2px;}
+        .tag{display:inline-block;border:1px solid #d1d5db;border-radius:4px;padding:3px 10px;font-size:12px;margin:3px 4px 3px 0;color:#374151;}
+        .tr{display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:6px;}
+        .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+        .tl{font-size:12px;color:#374151;flex:1;}
+        .bw{background:#fff7ed;color:#f97316;font-size:11px;padding:2px 10px;border-radius:999px;font-weight:600;}
+        .bo{background:#dcfce7;color:#16a34a;font-size:11px;padding:2px 10px;border-radius:999px;font-weight:600;}
+      </style></head><body>
+      <h2>📄 Application — ${fullName}</h2>
+      <div class="st">Document Info</div>
+      <div class="grid">
+        <div><div class="fl">Control No.</div><div class="fv">${record.tracking_id}</div></div>
+        <div><div class="fl">Effective Date</div><div class="fv">${record.submitted_at ? new Date(record.submitted_at).toLocaleDateString("en-CA") : "—"}</div></div>
+        <div><div class="fl">Office Code</div><div class="fv">${record.office_code ?? "—"}</div></div>
+        <div><div class="fl">Date Submitted</div><div class="fv">${record.submitted_at ? new Date(record.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}</div></div>
+      </div>
+      <div class="st">I. System Access</div>
+      <div class="grid">
+        <div><div class="fl">Account Action</div><div class="fv">${sysAccess?.account_type ?? "—"}</div></div>
+        <div><div class="fl">Sub-Action</div><div class="fv">—</div></div>
+        <div><div class="fl">User Type</div><div class="fv">${sysAccess?.user_type ?? "—"}</div></div>
+        <div><div class="fl">Login Mode</div><div class="fv">${sysAccess?.login_mode ?? "—"}</div></div>
+      </div>
+      <div class="st">II. User Information</div>
+      <div class="grid">
+        <div><div class="fl">Last Name</div><div class="fv">${userInfo?.last_name ?? "—"}</div></div>
+        <div><div class="fl">First Name</div><div class="fv">${userInfo?.first_name ?? "—"}</div></div>
+        <div><div class="fl">Middle Name</div><div class="fv">${userInfo?.middle_name ?? "—"}</div></div>
+        <div><div class="fl">Designation</div><div class="fv">${userInfo?.designation ?? "—"}</div></div>
+        <div><div class="fl">Employee ID</div><div class="fv">${userInfo?.employee_id ?? "—"}</div></div>
+        <div><div class="fl">Contact No.</div><div class="fv">${userInfo?.contact_no ?? "—"}</div></div>
+      </div>
+      <div class="grid"><div><div class="fl">Email</div><div class="fv">${userInfo?.email ?? "—"}</div></div></div>
+      ${modules?.selected_modules?.length > 0 ? `<div class="st">III. Modules</div><div>${modules.selected_modules.map((m: string) => `<span class="tag">${m}</span>`).join("")}</div>` : ""}
+      <div class="st">IV. Approval Trail</div>
+      <div class="tr"><div class="dot" style="background:${record.approved_by_l1 ? "#16a34a" : "#d1d5db"}"></div><div class="tl">Level 1 — Chief of Office</div><span class="${record.approved_by_l1 ? "bo" : "bw"}">${record.approved_by_l1 ? "✅ Approved" : "⏳ Waiting"}</span></div>
+      <div class="tr"><div class="dot" style="background:${record.approved_by_l2 ? "#16a34a" : "#d1d5db"}"></div><div class="tl">Level 2 (shared gate)</div><span class="${record.approved_by_l2 ? "bo" : "bw"}">${record.approved_by_l2 ? "✅ Approved" : "⏳ Waiting"}</span></div>
+      <div class="tr"><div class="dot" style="background:${record.approved_by_l3 ? "#16a34a" : "#d1d5db"}"></div><div class="tl">Level 3 (shared gate)</div><span class="${record.approved_by_l3 ? "bo" : "bw"}">${record.approved_by_l3 ? "✅ Approved" : "⏳ Waiting"}</span></div>
+      </body></html>`);
+    win.document.close();
+    win.print();
   };
 
   return (
@@ -186,7 +227,6 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
       <main style={{ padding: "24px", maxWidth: 1100, margin: "0 auto" }}>
         {tab === "dashboard" && (
           <>
-            {/* ── OVERVIEW + FILTER + EXPORT ── */}
             <div
               style={{
                 display: "flex",
@@ -246,7 +286,6 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
               </div>
             </div>
 
-            {/* ── STAT CARDS ── */}
             <div
               style={{
                 display: "grid",
@@ -285,7 +324,6 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
               />
             </div>
 
-            {/* ── PENDING TABLE ── */}
             <div
               style={{
                 backgroundColor: "#fff",
@@ -306,7 +344,6 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                 <span style={{ fontWeight: 600, color: "#111827" }}>
                   ⏳ Pending — Awaiting Your Approval
                 </span>
-                {/* For L2/L3: show the shared-gate notice */}
                 {(admin.level === 2 || admin.level === 3) && (
                   <span
                     style={{
@@ -323,7 +360,6 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                   </span>
                 )}
               </div>
-
               {loading ? (
                 <div
                   style={{
@@ -468,7 +504,6 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
               )}
             </div>
 
-            {/* ── APPROVAL CHAIN LEGEND ── */}
             <div
               style={{
                 marginTop: 16,
@@ -489,14 +524,11 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                 Approval Chain Status
               </div>
               <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-                {/* Level 1 */}
                 <ChainLevel
                   lvl={1}
                   label="Level 1 Approver"
                   adminLevel={admin.level}
-                  isShared={false}
                 />
-                {/* L2 + L3 grouped */}
                 <div
                   style={{
                     display: "flex",
@@ -514,7 +546,6 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                     lvl={2}
                     label="Level 2"
                     adminLevel={admin.level}
-                    isShared
                   />
                   <span style={{ fontSize: "0.7rem", color: "#6b7280" }}>
                     or
@@ -523,15 +554,12 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                     lvl={3}
                     label="Level 3"
                     adminLevel={admin.level}
-                    isShared
                   />
                 </div>
-                {/* Level 4 */}
                 <ChainLevel
                   lvl={4}
                   label="Level 4 (Implementor)"
                   adminLevel={admin.level}
-                  isShared={false}
                 />
               </div>
             </div>
@@ -565,7 +593,6 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                 pdfTitle={`All UAA Submissions — Level ${admin.level}`}
               />
             </div>
-
             {loading ? (
               <div
                 style={{
@@ -716,252 +743,501 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
         )}
       </main>
 
-      {/* ── VIEW MODAL ── */}
-      {viewModal && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            backgroundColor: "rgba(0,0,0,0.4)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 50,
-            padding: 16,
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: "#fff",
-              borderRadius: 16,
-              boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
-              width: "100%",
-              maxWidth: 500,
-            }}
-          >
+      {/* ══════════════════════════════════════════════════
+          VIEW MODAL — redesigned to match Image 1
+      ══════════════════════════════════════════════════ */}
+      {viewModal &&
+        (() => {
+          const userInfo = viewModal.uaa_user_info[0];
+          const sysAccess = viewModal.uaa_system_access[0];
+          const modules = viewModal.uaa_modules[0];
+          const fullName = userInfo
+            ? `${userInfo.last_name}, ${userInfo.first_name} ${userInfo.middle_name ?? ""}`.trim()
+            : "—";
+          const isRejected = viewModal.status === "Rejected";
+
+          const trailLevels = [
+            {
+              label: "Level 1 — Chief of Office",
+              approved: viewModal.approved_by_l1,
+              shared: false,
+            },
+            {
+              label: "Level 2",
+              approved: viewModal.approved_by_l2,
+              shared: true,
+            },
+            {
+              label: "Level 3",
+              approved: viewModal.approved_by_l3,
+              shared: true,
+            },
+          ];
+
+          return (
             <div
               style={{
-                padding: "16px 24px",
-                borderBottom: "1px solid #f3f4f6",
+                position: "fixed",
+                inset: 0,
+                backgroundColor: "rgba(0,0,0,0.5)",
                 display: "flex",
-                justifyContent: "space-between",
                 alignItems: "center",
+                justifyContent: "center",
+                zIndex: 50,
+                padding: 16,
               }}
             >
-              <span style={{ fontWeight: 700, color: "#111827" }}>
-                Request Details
-              </span>
-              <button
-                onClick={() => setViewModal(null)}
+              <div
                 style={{
-                  background: "none",
-                  border: "none",
-                  fontSize: "1.25rem",
-                  cursor: "pointer",
-                  color: "#9ca3af",
+                  backgroundColor: "#fff",
+                  borderRadius: 16,
+                  boxShadow: "0 24px 80px rgba(0,0,0,0.25)",
+                  width: "100%",
+                  maxWidth: 680,
+                  maxHeight: "90vh",
+                  display: "flex",
+                  flexDirection: "column",
+                  overflow: "hidden",
                 }}
               >
-                ×
-              </button>
-            </div>
-            <div style={{ padding: "20px 24px" }}>
-              {(() => {
-                const userInfo = viewModal.uaa_user_info[0];
-                const sysAccess = viewModal.uaa_system_access[0];
-                const modules = viewModal.uaa_modules[0];
-                const fullName = userInfo
-                  ? `${userInfo.last_name}, ${userInfo.first_name} ${userInfo.middle_name ?? ""}`.trim()
-                  : "—";
-                return (
-                  <>
-                    <ModalRow
-                      label="Tracking ID"
+                {/* Header — dark blue like Image 1 */}
+                <div
+                  style={{
+                    backgroundColor: "#1e3a8a",
+                    color: "#fff",
+                    padding: "14px 20px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    flexShrink: 0,
+                  }}
+                >
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 10 }}
+                  >
+                    <span style={{ fontSize: "1rem" }}>📄</span>
+                    <span style={{ fontWeight: 700, fontSize: "0.95rem" }}>
+                      Application — {fullName}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setViewModal(null)}
+                    style={{
+                      background: "rgba(255,255,255,0.15)",
+                      border: "none",
+                      color: "#fff",
+                      width: 28,
+                      height: 28,
+                      borderRadius: "50%",
+                      fontSize: "1.1rem",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+
+                {/* Scrollable body */}
+                <div
+                  style={{ overflowY: "auto", padding: "20px 24px", flex: 1 }}
+                >
+                  {/* DOCUMENT INFO */}
+                  <SectionTitle label="Document Info" />
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "12px 32px",
+                      marginBottom: 4,
+                    }}
+                  >
+                    <InfoField
+                      label="Control No."
                       value={viewModal.tracking_id}
                     />
-                    <ModalRow label="Applicant" value={fullName} />
-                    <ModalRow
-                      label="Position"
-                      value={`${userInfo?.designation ?? "—"} • ${userInfo?.employee_id ?? "—"}`}
-                    />
-                    <ModalRow
-                      label="Office Code"
-                      value={viewModal.office_code ?? "—"}
-                    />
-                    <ModalRow
-                      label="Account Type"
-                      value={sysAccess?.account_type ?? "—"}
-                    />
-                    <ModalRow
-                      label="User Type"
-                      value={sysAccess?.user_type ?? "—"}
-                    />
-                    <ModalRow
-                      label="Login Mode"
-                      value={sysAccess?.login_mode ?? "—"}
-                    />
-                    <ModalRow
-                      label="Date Submitted"
+                    <InfoField
+                      label="Effective Date"
                       value={
                         viewModal.submitted_at
-                          ? new Date(
-                              viewModal.submitted_at,
-                            ).toLocaleDateString()
+                          ? new Date(viewModal.submitted_at).toLocaleDateString(
+                              "en-CA",
+                            )
                           : "—"
                       }
                     />
-                    {modules?.selected_modules?.length > 0 && (
-                      <ModalRow
-                        label="Modules"
-                        value={modules.selected_modules.join(", ")}
-                      />
-                    )}
+                    <InfoField
+                      label="Office Code"
+                      value={viewModal.office_code ?? "—"}
+                    />
+                    <InfoField
+                      label="Date Submitted"
+                      value={
+                        viewModal.submitted_at
+                          ? new Date(viewModal.submitted_at).toLocaleDateString(
+                              "en-US",
+                              {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              },
+                            )
+                          : "—"
+                      }
+                    />
+                  </div>
 
-                    {/* ── Approval Chain ── */}
-                    <div
-                      style={{
-                        borderTop: "1px solid #f3f4f6",
-                        marginTop: 12,
-                        paddingTop: 12,
-                      }}
-                    >
+                  {/* I. SYSTEM ACCESS */}
+                  <SectionTitle label="I. System Access" />
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "12px 32px",
+                      marginBottom: 4,
+                    }}
+                  >
+                    <InfoField
+                      label="Account Action"
+                      value={sysAccess?.account_type ?? "—"}
+                    />
+                    <InfoField label="Sub-Action" value="—" />
+                    <InfoField
+                      label="User Type"
+                      value={sysAccess?.user_type ?? "—"}
+                    />
+                    <InfoField
+                      label="Login Mode"
+                      value={sysAccess?.login_mode ?? "—"}
+                    />
+                  </div>
+
+                  {/* II. USER INFORMATION */}
+                  <SectionTitle label="II. User Information" />
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "12px 32px",
+                      marginBottom: 4,
+                    }}
+                  >
+                    <InfoField
+                      label="Last Name"
+                      value={userInfo?.last_name ?? "—"}
+                    />
+                    <InfoField
+                      label="First Name"
+                      value={userInfo?.first_name ?? "—"}
+                    />
+                    <InfoField
+                      label="Middle Name"
+                      value={userInfo?.middle_name ?? "—"}
+                    />
+                    <InfoField
+                      label="Designation"
+                      value={userInfo?.designation ?? "—"}
+                    />
+                    <InfoField
+                      label="Employee ID"
+                      value={userInfo?.employee_id ?? "—"}
+                    />
+                    <InfoField
+                      label="Contact No."
+                      value={userInfo?.contact_no ?? "—"}
+                    />
+                  </div>
+                  <div style={{ marginBottom: 4 }}>
+                    <InfoField label="Email" value={userInfo?.email ?? "—"} />
+                  </div>
+
+                  {/* III. MODULES */}
+                  {modules?.selected_modules?.length > 0 && (
+                    <>
+                      <SectionTitle label="III. Modules" />
                       <div
                         style={{
-                          fontSize: "0.7rem",
-                          fontWeight: 600,
-                          color: "#6b7280",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.05em",
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: 6,
                           marginBottom: 8,
                         }}
                       >
-                        Approval Chain
+                        {modules.selected_modules.map(
+                          (m: string, idx: number) => (
+                            <span
+                              key={idx}
+                              style={{
+                                border: "1px solid #d1d5db",
+                                borderRadius: 6,
+                                padding: "4px 12px",
+                                fontSize: "0.75rem",
+                                color: "#374151",
+                                backgroundColor: "#f9fafb",
+                              }}
+                            >
+                              {m}
+                            </span>
+                          ),
+                        )}
                       </div>
+                    </>
+                  )}
 
-                      {/* L1 */}
-                      <ApprovalRow
-                        label="Level 1 Approver"
-                        approved={viewModal.approved_by_l1}
-                        isRejected={viewModal.status === "Rejected"}
-                      />
+                  {/* IV. APPROVAL TRAIL */}
+                  <SectionTitle label="IV. Approval Trail" />
+                  <div
+                    style={{ display: "flex", flexDirection: "column", gap: 6 }}
+                  >
+                    {trailLevels.map(({ label, approved, shared }, idx) => {
+                      const gateClosedByOther =
+                        shared &&
+                        ((idx === 1 &&
+                          !viewModal.approved_by_l2 &&
+                          viewModal.approved_by_l3) ||
+                          (idx === 2 &&
+                            !viewModal.approved_by_l3 &&
+                            viewModal.approved_by_l2));
 
-                      {/* L2/L3 shared gate */}
-                      <div
-                        style={{
-                          border: "1px dashed #bfdbfe",
-                          borderRadius: 8,
-                          padding: "8px 10px",
-                          marginBottom: 6,
-                        }}
-                      >
+                      let dotColor = "#d1d5db";
+                      let badgeBg = "#fff7ed";
+                      let badgeColor = "#f97316";
+                      let badgeText = "⏳ Waiting";
+
+                      if (isRejected) {
+                        dotColor = "#ef4444";
+                        badgeBg = "#fef2f2";
+                        badgeColor = "#ef4444";
+                        badgeText = "❌ Rejected";
+                      } else if (approved) {
+                        dotColor = "#16a34a";
+                        badgeBg = "#dcfce7";
+                        badgeColor = "#16a34a";
+                        badgeText = "✅ Approved";
+                      } else if (gateClosedByOther) {
+                        dotColor = "#e5e7eb";
+                        badgeBg = "#f3f4f6";
+                        badgeColor = "#9ca3af";
+                        badgeText = "— N/A";
+                      }
+
+                      return (
                         <div
+                          key={idx}
                           style={{
-                            fontSize: "0.68rem",
-                            color: "#93c5fd",
-                            marginBottom: 6,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 12,
+                            padding: "10px 14px",
+                            border: "1px solid #e5e7eb",
+                            borderRadius: 8,
+                            backgroundColor: "#fafafa",
                           }}
                         >
-                          Shared gate — either Level 2 or 3
+                          <span
+                            style={{
+                              width: 10,
+                              height: 10,
+                              borderRadius: "50%",
+                              backgroundColor: dotColor,
+                              flexShrink: 0,
+                              display: "inline-block",
+                            }}
+                          />
+                          <span
+                            style={{
+                              flex: 1,
+                              fontSize: "0.82rem",
+                              color: "#374151",
+                            }}
+                          >
+                            {label}
+                            {shared && (
+                              <span
+                                style={{
+                                  fontSize: "0.7rem",
+                                  color: "#9ca3af",
+                                  marginLeft: 6,
+                                }}
+                              >
+                                (shared gate)
+                              </span>
+                            )}
+                            {" — "}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: "0.75rem",
+                              fontWeight: 600,
+                              padding: "3px 12px",
+                              borderRadius: 999,
+                              backgroundColor: badgeBg,
+                              color: badgeColor,
+                            }}
+                          >
+                            {badgeText}
+                          </span>
                         </div>
-                        <ApprovalRow
-                          label="Level 2"
-                          approved={viewModal.approved_by_l2}
-                          isRejected={viewModal.status === "Rejected"}
-                        />
-                        <ApprovalRow
-                          label="Level 3"
-                          approved={viewModal.approved_by_l3}
-                          isRejected={viewModal.status === "Rejected"}
-                        />
-                      </div>
+                      );
+                    })}
+                  </div>
+                </div>
 
-                      {/* L4 */}
-                      <ApprovalRow
-                        label="Level 4 (Implementor)"
-                        approved={viewModal.approved_by_l4}
-                        isRejected={viewModal.status === "Rejected"}
-                      />
-                    </div>
-                  </>
-                );
-              })()}
-            </div>
-
-            {/* Modal footer — action buttons */}
-            <div
-              style={{
-                padding: "12px 24px",
-                backgroundColor: "#f9fafb",
-                borderRadius: "0 0 16px 16px",
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: 8,
-              }}
-            >
-              {canActOnRecord(viewModal) && (
-                <>
+                {/* Footer */}
+                <div
+                  style={{
+                    padding: "12px 20px",
+                    borderTop: "1px solid #e5e7eb",
+                    backgroundColor: "#f9fafb",
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    gap: 8,
+                    flexShrink: 0,
+                  }}
+                >
+                  {canActOnRecord(viewModal) && (
+                    <>
+                      <button
+                        onClick={() => handleApprove(viewModal.id)}
+                        style={{
+                          fontSize: "0.875rem",
+                          padding: "10px 24px",
+                          border: "none",
+                          borderRadius: 8,
+                          cursor: "pointer",
+                          background: "#16a34a",
+                          color: "#fff",
+                          fontWeight: 700,
+                        }}
+                      >
+                        ✓ Approve
+                      </button>
+                      <button
+                        onClick={() => handleReject(viewModal.id)}
+                        style={{
+                          fontSize: "0.875rem",
+                          padding: "10px 24px",
+                          border: "none",
+                          borderRadius: 8,
+                          cursor: "pointer",
+                          background: "#ef4444",
+                          color: "#fff",
+                          fontWeight: 700,
+                        }}
+                      >
+                        ✕ Reject
+                      </button>
+                    </>
+                  )}
                   <button
-                    onClick={() => handleReject(viewModal.id)}
+                    onClick={() => handleExportPDF(viewModal)}
                     style={{
                       fontSize: "0.875rem",
-                      padding: "8px 16px",
-                      border: "1px solid #f87171",
+                      padding: "10px 18px",
+                      border: "1px solid #e5e7eb",
                       borderRadius: 8,
                       cursor: "pointer",
                       background: "#fff",
-                      color: "#ef4444",
+                      color: "#374151",
+                      fontWeight: 500,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
                     }}
                   >
-                    ❌ Reject
+                    🖨 Export PDF
                   </button>
                   <button
-                    onClick={() => handleApprove(viewModal.id)}
+                    onClick={() => setViewModal(null)}
                     style={{
                       fontSize: "0.875rem",
-                      padding: "8px 16px",
-                      border: "1px solid #4ade80",
+                      padding: "10px 18px",
+                      border: "1px solid #e5e7eb",
                       borderRadius: 8,
                       cursor: "pointer",
                       background: "#fff",
-                      color: "#16a34a",
+                      color: "#6b7280",
                     }}
                   >
-                    ✅ Approve
+                    Close
                   </button>
-                </>
-              )}
-              <button
-                onClick={() => setViewModal(null)}
-                style={{
-                  fontSize: "0.875rem",
-                  padding: "8px 16px",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 8,
-                  cursor: "pointer",
-                  background: "#fff",
-                }}
-              >
-                Close
-              </button>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          );
+        })()}
     </div>
   );
 }
 
-// ── Sub-components ────────────────────────────────────────────────────
+// ── Helper components ─────────────────────────────────────────────────
+
+function SectionTitle({ label }: { label: string }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        margin: "16px 0 10px",
+      }}
+    >
+      <div
+        style={{
+          width: 3,
+          height: 16,
+          backgroundColor: "#1e3a8a",
+          borderRadius: 2,
+          flexShrink: 0,
+        }}
+      />
+      <span
+        style={{
+          fontSize: "0.7rem",
+          fontWeight: 700,
+          color: "#1e3a8a",
+          textTransform: "uppercase",
+          letterSpacing: "0.08em",
+        }}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function InfoField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div
+        style={{
+          fontSize: "0.65rem",
+          fontWeight: 700,
+          color: "#9ca3af",
+          textTransform: "uppercase",
+          letterSpacing: "0.07em",
+          marginBottom: 3,
+        }}
+      >
+        {label}
+      </div>
+      <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "#111827" }}>
+        {value}
+      </div>
+    </div>
+  );
+}
 
 function ChainLevel({
   lvl,
   label,
   adminLevel,
-  isShared,
 }: {
   lvl: number;
   label: string;
   adminLevel: number;
-  isShared: boolean;
 }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -988,46 +1264,6 @@ function ChainLevel({
       >
         {label}
         {lvl === adminLevel ? " ← You" : ""}
-      </span>
-    </div>
-  );
-}
-
-function ApprovalRow({
-  label,
-  approved,
-  isRejected,
-}: {
-  label: string;
-  approved: boolean | null | undefined;
-  isRejected: boolean;
-}) {
-  const color = isRejected ? "#ef4444" : approved ? "#16a34a" : "#f97316";
-  const bg = isRejected ? "#fee2e2" : approved ? "#dcfce7" : "#f3f4f6";
-  const lbl = isRejected ? "Rejected" : approved ? "Approved" : "Pending";
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        marginBottom: 6,
-      }}
-    >
-      <span style={{ fontSize: "0.75rem", color: "#9ca3af", width: 140 }}>
-        {label}:
-      </span>
-      <span
-        style={{
-          fontSize: "0.75rem",
-          fontWeight: 500,
-          padding: "2px 10px",
-          borderRadius: 999,
-          backgroundColor: bg,
-          color,
-        }}
-      >
-        {lbl}
       </span>
     </div>
   );
@@ -1117,24 +1353,5 @@ function ActionBtn({
     >
       {label}
     </button>
-  );
-}
-
-function ModalRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
-      <span
-        style={{
-          fontSize: "0.75rem",
-          color: "#9ca3af",
-          width: 120,
-          flexShrink: 0,
-          paddingTop: 2,
-        }}
-      >
-        {label}
-      </span>
-      <span style={{ fontSize: "0.875rem", color: "#111827" }}>{value}</span>
-    </div>
   );
 }
