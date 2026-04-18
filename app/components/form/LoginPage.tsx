@@ -2,13 +2,14 @@
 import { useState } from "react";
 
 interface LoginPageProps {
-  onLogin: (username: string, password: string) => boolean;
+  onLogin: (username: string, password: string) => boolean | Promise<boolean>;
   onRegister?: () => void;
 }
 
 export default function LoginPage({ onLogin, onRegister }: LoginPageProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -17,7 +18,7 @@ export default function LoginPage({ onLogin, onRegister }: LoginPageProps) {
     setError("");
     setIsLoading(true);
     await new Promise((r) => setTimeout(r, 400));
-    const success = onLogin(username, password);
+    const success = await onLogin(username, password);
     if (!success) {
       setError("Invalid username or password.");
     }
@@ -123,7 +124,7 @@ export default function LoginPage({ onLogin, onRegister }: LoginPageProps) {
             />
           </div>
 
-          {/* Password */}
+          {/* Password with show/hide */}
           <div style={{ marginBottom: "20px" }}>
             <label
               style={{
@@ -138,26 +139,48 @@ export default function LoginPage({ onLogin, onRegister }: LoginPageProps) {
             >
               Password
             </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              required
-              style={{
-                width: "100%",
-                border: "1px solid #e5e7eb",
-                borderRadius: "8px",
-                padding: "12px 16px",
-                fontSize: "0.875rem",
-                color: "#374151",
-                outline: "none",
-                boxSizing: "border-box",
-                transition: "border-color 0.15s",
-              }}
-              onFocus={(e) => (e.target.style.borderColor = "#3b82f6")}
-              onBlur={(e) => (e.target.style.borderColor = "#e5e7eb")}
-            />
+            <div style={{ position: "relative" }}>
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                required
+                style={{
+                  width: "100%",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "8px",
+                  padding: "12px 48px 12px 16px",
+                  fontSize: "0.875rem",
+                  color: "#374151",
+                  outline: "none",
+                  boxSizing: "border-box",
+                  transition: "border-color 0.15s",
+                }}
+                onFocus={(e) => (e.target.style.borderColor = "#3b82f6")}
+                onBlur={(e) => (e.target.style.borderColor = "#e5e7eb")}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                style={{
+                  position: "absolute",
+                  right: "12px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  color: "#6b7280",
+                  fontSize: "0.75rem",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  padding: 0,
+                  userSelect: "none",
+                }}
+              >
+                {showPassword ? "Hide" : "Show"}
+              </button>
+            </div>
           </div>
 
           {error && (

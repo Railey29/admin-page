@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
 import { AdminCredential } from "../models/authModel";
-import { validateAdminLogin } from "../controllers/authController";
 
 const SESSION_KEY = "lto_admin_session";
 
@@ -20,14 +19,31 @@ export function useAdminAuth() {
     }
   }, []);
 
-  const login = (username: string, password: string): boolean => {
-    const cred = validateAdminLogin(username, password);
-    if (cred) {
+  const login = async (
+    username: string,
+    password: string,
+  ): Promise<boolean> => {
+    try {
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        console.error("Login failed:", err.error);
+        return false;
+      }
+
+      const cred: AdminCredential = await res.json();
       setAdmin(cred);
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(cred));
       return true;
+    } catch (err) {
+      console.error("Network error during login:", err);
+      return false;
     }
-    return false;
   };
 
   const logout = () => {

@@ -27,64 +27,76 @@ export async function POST(req: NextRequest) {
     const isApproved = status === "Processed";
 
     const subject = isApproved
-      ? `✅ Your UAA Request Has Been Processed — ${trackingId}`
-      : `❌ Your UAA Request Was Rejected — ${trackingId}`;
+      ? `LTO MID 2026 - Access Request Approved (${trackingId})`
+      : `LTO MID 2026 - Access Request Disapproved (${trackingId})`;
 
-    const html = `
-      <div style="font-family: system-ui, sans-serif; max-width: 560px; margin: auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
-        <!-- Header -->
-        <div style="background: #1e3a8a; padding: 20px 28px;">
-          <div style="color: #fff; font-size: 1.1rem; font-weight: 700;">LTO MID 2026 — Admin Portal</div>
-          <div style="color: #bfdbfe; font-size: 0.8rem; margin-top: 4px;">User Access Administration (UAA)</div>
-        </div>
+    // Generate email content based on status
+    const html = isApproved
+      ? `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; line-height: 1.6; color: #333;">
+        <div style="padding: 20px;">
+          <p>Good day.</p>
 
-        <!-- Body -->
-        <div style="padding: 28px;">
-          <p style="margin: 0 0 16px; color: #111827; font-size: 0.95rem;">
-            Dear <strong>${applicantName}</strong>,
+          <p>We are pleased to inform you that your request for user access authorization to the Land Transportation Management System has been approved.</p>
+
+          <p>The corresponding access privileges have been successfully configured based on the details provided in your request. You may now log in to the system using your assigned credentials.</p>
+
+          <p>Please be reminded to strictly adhere to all applicable policies, security protocols, and data privacy regulations in the use of the system.</p>
+
+          <p>For any technical concerns or assistance, you may coordinate with the Management Information Division (MID) through <a href="mailto:mid-centraloffice@lto.gov.ph">mid-centraloffice@lto.gov.ph</a></p>
+
+          <p>Thank you.</p>
+
+          <p style="margin-top: 30px;">
+            Respectfully,<br />
+            <strong>Management Information Division (MID)</strong><br />
+            Land Transportation Office (LTO)
           </p>
 
-          ${
-            isApproved
-              ? `<div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px;">
-                   <div style="color: #16a34a; font-weight: 700; font-size: 1rem;">✅ Request Processed</div>
-                   <p style="color: #166534; margin: 8px 0 0; font-size: 0.875rem;">
-                     Your UAA request (Tracking ID: <strong>${trackingId}</strong>) has been successfully processed.
-                     Your system access will be activated shortly.
-                   </p>
-                 </div>`
-              : `<div style="background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px;">
-                   <div style="color: #dc2626; font-weight: 700; font-size: 1rem;">❌ Request Rejected</div>
-                   <p style="color: #991b1b; margin: 8px 0 0; font-size: 0.875rem;">
-                     Your UAA request (Tracking ID: <strong>${trackingId}</strong>) has been rejected.
-                   </p>
-                   ${
-                     comment
-                       ? `<div style="margin-top: 12px; background: #fff; border: 1px solid #fecaca; border-radius: 6px; padding: 10px 14px;">
-                            <div style="font-size: 0.7rem; color: #9ca3af; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Reason / Comment</div>
-                            <div style="color: #374151; font-size: 0.875rem;">${comment}</div>
-                          </div>`
-                       : ""
-                   }
-                 </div>`
-          }
+          <hr style="margin: 20px 0; border: none; border-top: 1px solid #e5e7eb;" />
 
-          <p style="color: #6b7280; font-size: 0.8rem; margin: 0;">
-            If you have questions, please contact your regional administrator or visit the LTO Admin Portal.
+          <p style="font-size: 0.75rem; color: #9ca3af;">
+            Reference: Tracking ID <strong>${trackingId}</strong><br />
+            This is an automated message from LTO MID 2026 Admin Portal.
           </p>
         </div>
+      </div>
+    `
+      : `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; line-height: 1.6; color: #333;">
+        <div style="padding: 20px;">
+          <p>Good day.</p>
 
-        <!-- Footer -->
-        <div style="background: #f9fafb; padding: 14px 28px; border-top: 1px solid #f3f4f6;">
-          <p style="margin: 0; font-size: 0.7rem; color: #9ca3af;">
-            This is an automated message from LTO MID 2026 Admin Portal. Do not reply to this email.
+          <p>We regret to inform you that your request for user access authorization to the Land Transportation Management System has been disapproved.</p>
+
+          <p>This action was taken due to incomplete requirements, insufficient justification, or non-compliance with existing policies.</p>
+
+          ${comment ? `<p><strong>Reason(s):</strong> ${comment}</p>` : ""}
+
+          <p>You may review and address the noted concern(s) and submit a new request for evaluation.</p>
+
+          <p>For further clarification or assistance, you may contact the Management Information Division (MID) through <a href="mailto:mid-centraloffice@lto.gov.ph">mid-centraloffice@lto.gov.ph</a></p>
+
+          <p>Thank you for your understanding.</p>
+
+          <p style="margin-top: 30px;">
+            Respectfully,<br />
+            <strong>Management Information Division (MID)</strong><br />
+            Land Transportation Office (LTO)
+          </p>
+
+          <hr style="margin: 20px 0; border: none; border-top: 1px solid #e5e7eb;" />
+
+          <p style="font-size: 0.75rem; color: #9ca3af;">
+            Reference: Tracking ID <strong>${trackingId}</strong><br />
+            This is an automated message from LTO MID 2026 Admin Portal.
           </p>
         </div>
       </div>
     `;
 
     await transporter.sendMail({
-      from: `"LTO MID 2026 Admin Portal" <${process.env.SMTP_USER}>`,
+      from: `"LTO Management Information Division" <${process.env.SMTP_USER}>`,
       to,
       subject,
       html,
