@@ -122,7 +122,7 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
       >
         <div>
           <div style={{ fontWeight: 700, fontSize: "1.05rem" }}>
-            LTO MID 2026 — Admin Portal
+            LTO User Access Authorization Form
           </div>
           <div style={{ fontSize: "0.75rem", color: "#bfdbfe", marginTop: 2 }}>
             Request Processing Dashboard

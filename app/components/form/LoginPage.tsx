@@ -48,7 +48,7 @@ export default function LoginPage({ onLogin, onRegister }: LoginPageProps) {
             letterSpacing: "0.05em",
           }}
         >
-          LTO MID 2026
+          LTO User Access Authorization Form
         </h1>
         <p style={{ color: "#9ca3af", marginTop: "4px", fontSize: "0.875rem" }}>
           User Access Authorization System

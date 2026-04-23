@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { AdminCredential } from "../../models/authModel";
 import { useSubmissions, SubmissionRecord } from "../../hooks/useSubmissions";
+import { EmailPayload } from "../../models/emailModel";
 import ExportButtons from "../ui/ExportButtons";
 
 interface Props {
@@ -11,12 +12,30 @@ interface Props {
 
 type Tab = "dashboard" | "reports";
 
+// ── Same pattern as Level4Dashboard ──────────────────────────────────
+async function sendStatusEmail(payload: EmailPayload) {
+  try {
+    await fetch("/api/send-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    console.error("[Level1to3Dashboard] Failed to send email:", err);
+  }
+}
+
 export default function Level1to3Dashboard({ admin, onLogout }: Props) {
   const [tab, setTab] = useState<Tab>("dashboard");
   const [filter, setFilter] = useState<
     "thisWeek" | "thisMonth" | "thisYear" | "allTime"
   >("thisWeek");
   const [viewModal, setViewModal] = useState<SubmissionRecord | null>(null);
+
+  // ── Reject comment modal state (same as Level4) ───────────────────
+  const [rejectModal, setRejectModal] = useState<SubmissionRecord | null>(null);
+  const [rejectComment, setRejectComment] = useState("");
+  const [sending, setSending] = useState(false);
 
   const { submissions, stats, loading, approve, reject } = useSubmissions(
     admin.level,
@@ -41,9 +60,36 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
     setViewModal(null);
   };
 
-  const handleReject = async (id: number) => {
-    await reject(id);
+  // ── Opens the reject comment modal (same flow as Level4) ──────────
+  const openRejectModal = (record: SubmissionRecord) => {
+    setRejectComment("");
+    setRejectModal(record);
     setViewModal(null);
+  };
+
+  // ── Confirms rejection + sends email (mirrors Level4 handleConfirm) ─
+  const handleConfirmReject = async () => {
+    if (!rejectModal) return;
+
+    const userInfo = rejectModal.uaa_user_info[0];
+    const fullName = userInfo
+      ? `${userInfo.last_name}, ${userInfo.first_name} ${userInfo.middle_name ?? ""}`.trim()
+      : "Applicant";
+
+    setSending(true);
+    try {
+      await reject(rejectModal.id);
+      await sendStatusEmail({
+        to: userInfo?.email ?? "",
+        applicantName: fullName,
+        trackingId: rejectModal.tracking_id,
+        status: "Rejected",
+        comment: rejectComment.trim() || undefined,
+      });
+    } finally {
+      setSending(false);
+      setRejectModal(null);
+    }
   };
 
   const filterLabels: Record<string, string> = {
@@ -165,7 +211,7 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
       >
         <div>
           <div style={{ fontWeight: 700, fontSize: "1.05rem" }}>
-            LTO MID 2026 — Admin Portal
+            LTO User Access Authorization Form
           </div>
           <div style={{ fontSize: "0.75rem", color: "#bfdbfe", marginTop: 2 }}>
             {admin.displayName} — {admin.role}
@@ -488,8 +534,9 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                                 borderColor="#4ade80"
                                 label="✅ Approve"
                               />
+                              {/* ── Reject now opens comment modal ── */}
                               <ActionBtn
-                                onClick={() => handleReject(req.id)}
+                                onClick={() => openRejectModal(req)}
                                 color="#ef4444"
                                 borderColor="#f87171"
                                 label="❌ Reject"
@@ -744,7 +791,7 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
       </main>
 
       {/* ══════════════════════════════════════════════════
-          VIEW MODAL — redesigned to match Image 1
+          VIEW MODAL
       ══════════════════════════════════════════════════ */}
       {viewModal &&
         (() => {
@@ -800,7 +847,6 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                   overflow: "hidden",
                 }}
               >
-                {/* Header — dark blue like Image 1 */}
                 <div
                   style={{
                     backgroundColor: "#1e3a8a",
@@ -840,11 +886,9 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                   </button>
                 </div>
 
-                {/* Scrollable body */}
                 <div
                   style={{ overflowY: "auto", padding: "20px 24px", flex: 1 }}
                 >
-                  {/* DOCUMENT INFO */}
                   <SectionTitle label="Document Info" />
                   <div
                     style={{
@@ -889,7 +933,6 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                     />
                   </div>
 
-                  {/* I. SYSTEM ACCESS */}
                   <SectionTitle label="I. System Access" />
                   <div
                     style={{
@@ -914,7 +957,6 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                     />
                   </div>
 
-                  {/* II. USER INFORMATION */}
                   <SectionTitle label="II. User Information" />
                   <div
                     style={{
@@ -953,7 +995,6 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                     <InfoField label="Email" value={userInfo?.email ?? "—"} />
                   </div>
 
-                  {/* III. MODULES */}
                   {modules?.selected_modules?.length > 0 && (
                     <>
                       <SectionTitle label="III. Modules" />
@@ -986,7 +1027,6 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                     </>
                   )}
 
-                  {/* IV. APPROVAL TRAIL */}
                   <SectionTitle label="IV. Approval Trail" />
                   <div
                     style={{ display: "flex", flexDirection: "column", gap: 6 }}
@@ -1085,7 +1125,6 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                   </div>
                 </div>
 
-                {/* Footer */}
                 <div
                   style={{
                     padding: "12px 20px",
@@ -1114,8 +1153,9 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                       >
                         ✓ Approve
                       </button>
+                      {/* ── Reject in modal also opens comment modal ── */}
                       <button
-                        onClick={() => handleReject(viewModal.id)}
+                        onClick={() => openRejectModal(viewModal)}
                         style={{
                           fontSize: "0.875rem",
                           padding: "10px 24px",
@@ -1168,6 +1208,181 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
             </div>
           );
         })()}
+
+      {/* ══════════════════════════════════════════════════
+          REJECT COMMENT MODAL — same design as Level4
+      ══════════════════════════════════════════════════ */}
+      {rejectModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(0,0,0,0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 60,
+            padding: 16,
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#fff",
+              borderRadius: 16,
+              boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+              width: "100%",
+              maxWidth: 460,
+            }}
+          >
+            {/* Modal header */}
+            <div
+              style={{
+                padding: "16px 24px",
+                borderBottom: "1px solid #f3f4f6",
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+              }}
+            >
+              <span style={{ fontSize: "1.2rem" }}>❌</span>
+              <span style={{ fontWeight: 700, color: "#111827" }}>
+                Flag as Issue / Reject
+              </span>
+            </div>
+
+            <div style={{ padding: "20px 24px" }}>
+              {/* Applicant info card */}
+              {(() => {
+                const userInfo = rejectModal.uaa_user_info[0];
+                const fullName = userInfo
+                  ? `${userInfo.last_name}, ${userInfo.first_name}`.trim()
+                  : "—";
+                return (
+                  <div
+                    style={{
+                      backgroundColor: "#f9fafb",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 8,
+                      padding: "10px 14px",
+                      marginBottom: 16,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: "0.7rem",
+                        color: "#9ca3af",
+                        marginBottom: 2,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
+                      }}
+                    >
+                      Applicant
+                    </div>
+                    <div style={{ fontWeight: 600, color: "#111827" }}>
+                      {fullName}
+                    </div>
+                    <div style={{ fontSize: "0.75rem", color: "#6b7280" }}>
+                      {rejectModal.tracking_id}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <label
+                style={{
+                  fontSize: "0.8rem",
+                  fontWeight: 600,
+                  color: "#374151",
+                  display: "block",
+                  marginBottom: 6,
+                }}
+              >
+                Reason / Comment *
+              </label>
+              <textarea
+                value={rejectComment}
+                onChange={(e) => setRejectComment(e.target.value)}
+                rows={4}
+                placeholder="Describe the issue or reason for rejection..."
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  border: `1px solid ${!rejectComment.trim() ? "#fca5a5" : "#d1d5db"}`,
+                  borderRadius: 8,
+                  fontSize: "0.875rem",
+                  color: "#111827",
+                  resize: "vertical",
+                  outline: "none",
+                  fontFamily: "system-ui, sans-serif",
+                  boxSizing: "border-box",
+                }}
+              />
+              <div
+                style={{
+                  marginTop: 10,
+                  display: "flex",
+                  gap: 6,
+                  alignItems: "flex-start",
+                }}
+              >
+                <span style={{ fontSize: "0.8rem" }}>📧</span>
+                <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>
+                  An email notification will be sent to the applicant&apos;s
+                  registered email address.
+                </span>
+              </div>
+            </div>
+
+            {/* Modal footer */}
+            <div
+              style={{
+                padding: "12px 24px",
+                backgroundColor: "#f9fafb",
+                borderRadius: "0 0 16px 16px",
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 8,
+              }}
+            >
+              <button
+                onClick={() => setRejectModal(null)}
+                disabled={sending}
+                style={{
+                  fontSize: "0.875rem",
+                  padding: "8px 16px",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  background: "#fff",
+                  color: "#6b7280",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmReject}
+                disabled={sending || !rejectComment.trim()}
+                style={{
+                  fontSize: "0.875rem",
+                  padding: "8px 20px",
+                  border: "none",
+                  borderRadius: 8,
+                  cursor:
+                    sending || !rejectComment.trim()
+                      ? "not-allowed"
+                      : "pointer",
+                  background: "#ef4444",
+                  color: "#fff",
+                  fontWeight: 600,
+                  opacity: sending || !rejectComment.trim() ? 0.6 : 1,
+                }}
+              >
+                {sending ? "Sending..." : "❌ Reject & Notify"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

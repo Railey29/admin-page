@@ -12,7 +12,6 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-
     const account = await prisma.admin_accounts.findUnique({
       where: { username },
     });
