@@ -19,5 +19,22 @@ export const ADMIN_CREDENTIALS: AdminCredential[] = [
     displayName: "Administrator",
     role: "Admin",
   },
-  // add more admins here as needed
 ];
+
+export type ApprovalStatus = "pending" | "approved" | "rejected" | null;
+
+export interface ApprovalRequest {
+  id: string;
+  applicantName: string;
+  position: string;
+  employeeId: string;
+  dateSubmitted: string;
+  dateApproved?: string;
+  officeCode: string;
+  accountType: string;
+  modules: string[];
+  level1Status: ApprovalStatus;
+  level2Status: ApprovalStatus;
+  level3Status: ApprovalStatus;
+  level4Status: ApprovalStatus;
+}
