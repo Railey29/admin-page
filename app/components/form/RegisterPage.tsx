@@ -226,7 +226,7 @@ export default function RegisterPage({
       placeholder: "Enter your first name",
     },
     {
-      label: "Middle Name (Optional)",
+      label: "Middle Name",
       name: "middleName",
       placeholder: "Enter your middle name",
       optional: true,
