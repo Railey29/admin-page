@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 interface RegisterPageProps {
   onRegister: (data: {
@@ -49,6 +49,27 @@ const DESIGNATION_OPTIONS = [
   },
 ];
 
+// Map error keywords → field names so we can highlight them
+const ERROR_FIELD_MAP: { keywords: string[]; field: string }[] = [
+  { keywords: ["employee number", "lto"], field: "ltoEmployeeNumber" },
+  { keywords: ["first name"], field: "firstName" },
+  { keywords: ["last name"], field: "lastName" },
+  { keywords: ["username"], field: "username" },
+  { keywords: ["password"], field: "password" },
+  {
+    keywords: ["confirm password", "passwords do not match"],
+    field: "confirmPassword",
+  },
+  { keywords: ["designation", "level", "access level"], field: "level" },
+];
+
+function getErrorFields(errorMsg: string): string[] {
+  const lower = errorMsg.toLowerCase();
+  return ERROR_FIELD_MAP.filter(({ keywords }) =>
+    keywords.some((k) => lower.includes(k)),
+  ).map(({ field }) => field);
+}
+
 export default function RegisterPage({
   onRegister,
   onBackToLogin,
@@ -68,19 +89,52 @@ export default function RegisterPage({
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
+  const [errorFields, setErrorFields] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  const errorRef = useRef<HTMLDivElement>(null);
+  const fieldRefs = useRef<Record<string, HTMLElement | null>>({});
+
+  const setFieldRef = (name: string) => (el: HTMLElement | null) => {
+    fieldRefs.current[name] = el;
+  };
+
+  const showError = (msg: string) => {
+    const fields = getErrorFields(msg);
+    setError(msg);
+    setErrorFields(fields);
+
+    // Scroll to the first offending field, or to the error box if no field matched
+    setTimeout(() => {
+      const firstField = fields[0] && fieldRefs.current[fields[0]];
+      if (firstField) {
+        firstField.scrollIntoView({ behavior: "smooth", block: "center" });
+        (
+          firstField.querySelector("input,select") as HTMLElement | null
+        )?.focus();
+      } else {
+        errorRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }
+    }, 50);
+  };
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     const { name, value } = e.target;
+    // Clear error highlight for this field when user edits it
+    setErrorFields((prev) => prev.filter((f) => f !== name));
+
     if (name === "level") {
       const selected = DESIGNATION_OPTIONS.find((o) => o.value === value);
       setForm((prev) => ({
         ...prev,
         level: value,
         designation: selected?.designation ?? "",
-        office: selected?.office ?? "", // ← office is now set from dropdown
+        office: selected?.office ?? "",
       }));
     } else {
       setForm((prev) => ({ ...prev, [name]: value }));
@@ -90,14 +144,16 @@ export default function RegisterPage({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setErrorFields([]);
 
     if (!form.level) {
-      setError("Please select your designation and access level.");
+      showError("Please select your designation and access level.");
       return;
     }
-
     if (form.password !== form.confirmPassword) {
-      setError("Passwords do not match.");
+      showError(
+        "Passwords do not match. Please re-enter your confirm password.",
+      );
       return;
     }
 
@@ -109,23 +165,27 @@ export default function RegisterPage({
       firstName: form.firstName,
       middleName: form.middleName,
       lastName: form.lastName,
-      office: form.office, // ← from dropdown
-      designation: form.designation, // ← from dropdown
+      office: form.office,
+      designation: form.designation,
       level: Number(form.level),
       username: form.username,
       password: form.password,
     });
 
     if (!success) {
-      setError("Registration failed. Please try again.");
+      showError(
+        "Registration failed. Please check your details and try again.",
+      );
     }
 
     setIsLoading(false);
   };
 
-  const inputStyle: React.CSSProperties = {
+  const isFieldError = (name: string) => errorFields.includes(name);
+
+  const inputStyle = (name: string): React.CSSProperties => ({
     width: "100%",
-    border: "1px solid #e5e7eb",
+    border: `1px solid ${isFieldError(name) ? "#ef4444" : "#e5e7eb"}`,
     borderRadius: "8px",
     padding: "12px 16px",
     fontSize: "0.875rem",
@@ -133,8 +193,9 @@ export default function RegisterPage({
     outline: "none",
     boxSizing: "border-box",
     transition: "border-color 0.15s",
-    backgroundColor: "#ffffff",
-  };
+    backgroundColor: isFieldError(name) ? "#fff5f5" : "#ffffff",
+    boxShadow: isFieldError(name) ? "0 0 0 3px rgba(239,68,68,0.12)" : "none",
+  });
 
   const labelStyle: React.CSSProperties = {
     display: "block",
@@ -146,14 +207,12 @@ export default function RegisterPage({
     marginBottom: "6px",
   };
 
-  const fieldStyle: React.CSSProperties = {
-    marginBottom: "18px",
-  };
+  const fieldStyle: React.CSSProperties = { marginBottom: "18px" };
 
   const textFields: {
     label: string;
     name: keyof typeof form;
-    type?: string;
+    optional?: boolean;
     placeholder: string;
   }[] = [
     {
@@ -167,20 +226,17 @@ export default function RegisterPage({
       placeholder: "Enter your first name",
     },
     {
-      label: "Middle Name",
+      label: "Middle Name (Optional)",
       name: "middleName",
       placeholder: "Enter your middle name",
+      optional: true,
     },
     {
       label: "Last Name",
       name: "lastName",
       placeholder: "Enter your last name",
     },
-    {
-      label: "Username",
-      name: "username",
-      placeholder: "Choose a username",
-    },
+    { label: "Username", name: "username", placeholder: "Choose a username" },
   ];
 
   return (
@@ -247,24 +303,62 @@ export default function RegisterPage({
         <form onSubmit={handleSubmit}>
           {/* Text fields */}
           {textFields.map((field) => (
-            <div key={field.name} style={fieldStyle}>
-              <label style={labelStyle}>{field.label}</label>
+            <div
+              key={field.name}
+              style={fieldStyle}
+              ref={setFieldRef(field.name) as any}
+            >
+              <label style={labelStyle}>
+                {field.label}
+                {field.optional && (
+                  <span
+                    style={{
+                      marginLeft: "6px",
+                      fontSize: "0.65rem",
+                      fontWeight: 400,
+                      color: "#9ca3af",
+                      textTransform: "none",
+                      letterSpacing: 0,
+                      fontStyle: "italic",
+                    }}
+                  >
+                    (optional)
+                  </span>
+                )}
+              </label>
               <input
-                type={field.type ?? "text"}
+                type="text"
                 name={field.name}
                 value={form[field.name]}
                 onChange={handleChange}
                 placeholder={field.placeholder}
-                required={field.name !== "middleName"}
-                style={inputStyle}
-                onFocus={(e) => (e.target.style.borderColor = "#3b82f6")}
-                onBlur={(e) => (e.target.style.borderColor = "#e5e7eb")}
+                required={!field.optional}
+                style={inputStyle(field.name)}
+                onFocus={(e) => {
+                  if (!isFieldError(field.name))
+                    e.target.style.borderColor = "#3b82f6";
+                }}
+                onBlur={(e) => {
+                  if (!isFieldError(field.name))
+                    e.target.style.borderColor = "#e5e7eb";
+                }}
               />
+              {isFieldError(field.name) && (
+                <p
+                  style={{
+                    color: "#ef4444",
+                    fontSize: "0.7rem",
+                    marginTop: "4px",
+                  }}
+                >
+                  ⚠ Please check this field.
+                </p>
+              )}
             </div>
           ))}
 
           {/* Designation / Office dropdown */}
-          <div style={fieldStyle}>
+          <div style={fieldStyle} ref={setFieldRef("level") as any}>
             <label style={labelStyle}>Designation / Office</label>
             <select
               name="level"
@@ -272,7 +366,7 @@ export default function RegisterPage({
               onChange={handleChange}
               required
               style={{
-                ...inputStyle,
+                ...inputStyle("level"),
                 appearance: "none",
                 WebkitAppearance: "none",
                 backgroundImage:
@@ -283,8 +377,14 @@ export default function RegisterPage({
                 cursor: "pointer",
                 color: form.level ? "#374151" : "#9ca3af",
               }}
-              onFocus={(e) => (e.target.style.borderColor = "#3b82f6")}
-              onBlur={(e) => (e.target.style.borderColor = "#e5e7eb")}
+              onFocus={(e) => {
+                if (!isFieldError("level"))
+                  e.target.style.borderColor = "#3b82f6";
+              }}
+              onBlur={(e) => {
+                if (!isFieldError("level"))
+                  e.target.style.borderColor = "#e5e7eb";
+              }}
             >
               {DESIGNATION_OPTIONS.map((opt) => (
                 <option
@@ -296,6 +396,17 @@ export default function RegisterPage({
                 </option>
               ))}
             </select>
+            {isFieldError("level") && (
+              <p
+                style={{
+                  color: "#ef4444",
+                  fontSize: "0.7rem",
+                  marginTop: "4px",
+                }}
+              >
+                ⚠ Please select your designation.
+              </p>
+            )}
             {form.level && (
               <p
                 style={{
@@ -319,7 +430,7 @@ export default function RegisterPage({
           </div>
 
           {/* Password */}
-          <div style={fieldStyle}>
+          <div style={fieldStyle} ref={setFieldRef("password") as any}>
             <label style={labelStyle}>Password</label>
             <div style={{ position: "relative" }}>
               <input
@@ -329,9 +440,15 @@ export default function RegisterPage({
                 onChange={handleChange}
                 placeholder="Create a password"
                 required
-                style={{ ...inputStyle, paddingRight: "48px" }}
-                onFocus={(e) => (e.target.style.borderColor = "#3b82f6")}
-                onBlur={(e) => (e.target.style.borderColor = "#e5e7eb")}
+                style={{ ...inputStyle("password"), paddingRight: "48px" }}
+                onFocus={(e) => {
+                  if (!isFieldError("password"))
+                    e.target.style.borderColor = "#3b82f6";
+                }}
+                onBlur={(e) => {
+                  if (!isFieldError("password"))
+                    e.target.style.borderColor = "#e5e7eb";
+                }}
               />
               <button
                 type="button"
@@ -354,10 +471,21 @@ export default function RegisterPage({
                 {showPassword ? "Hide" : "Show"}
               </button>
             </div>
+            {isFieldError("password") && (
+              <p
+                style={{
+                  color: "#ef4444",
+                  fontSize: "0.7rem",
+                  marginTop: "4px",
+                }}
+              >
+                ⚠ Please check your password.
+              </p>
+            )}
           </div>
 
           {/* Confirm Password */}
-          <div style={fieldStyle}>
+          <div style={fieldStyle} ref={setFieldRef("confirmPassword") as any}>
             <label style={labelStyle}>Confirm Password</label>
             <div style={{ position: "relative" }}>
               <input
@@ -367,9 +495,18 @@ export default function RegisterPage({
                 onChange={handleChange}
                 placeholder="Re-enter your password"
                 required
-                style={{ ...inputStyle, paddingRight: "48px" }}
-                onFocus={(e) => (e.target.style.borderColor = "#3b82f6")}
-                onBlur={(e) => (e.target.style.borderColor = "#e5e7eb")}
+                style={{
+                  ...inputStyle("confirmPassword"),
+                  paddingRight: "48px",
+                }}
+                onFocus={(e) => {
+                  if (!isFieldError("confirmPassword"))
+                    e.target.style.borderColor = "#3b82f6";
+                }}
+                onBlur={(e) => {
+                  if (!isFieldError("confirmPassword"))
+                    e.target.style.borderColor = "#e5e7eb";
+                }}
               />
               <button
                 type="button"
@@ -392,21 +529,46 @@ export default function RegisterPage({
                 {showConfirmPassword ? "Hide" : "Show"}
               </button>
             </div>
+            {isFieldError("confirmPassword") && (
+              <p
+                style={{
+                  color: "#ef4444",
+                  fontSize: "0.7rem",
+                  marginTop: "4px",
+                }}
+              >
+                ⚠ Passwords do not match.
+              </p>
+            )}
           </div>
 
+          {/* Error box */}
           {error && (
-            <p
+            <div
+              ref={errorRef}
               style={{
-                color: "#ef4444",
+                color: "#b91c1c",
                 fontSize: "0.875rem",
                 marginBottom: "16px",
                 backgroundColor: "#fef2f2",
+                border: "1px solid #fecaca",
                 borderRadius: "8px",
-                padding: "10px 14px",
+                padding: "12px 14px",
+                display: "flex",
+                alignItems: "flex-start",
+                gap: "8px",
               }}
             >
-              {error}
-            </p>
+              <span style={{ fontSize: "1rem", flexShrink: 0 }}>⛔</span>
+              <div>
+                <p style={{ margin: 0, fontWeight: 600, marginBottom: "2px" }}>
+                  Registration Error
+                </p>
+                <p style={{ margin: 0, fontWeight: 400, fontSize: "0.8rem" }}>
+                  {error}
+                </p>
+              </div>
+            </div>
           )}
 
           <button
@@ -436,7 +598,6 @@ export default function RegisterPage({
           </button>
         </form>
 
-        {/* Back to login */}
         <p
           style={{
             textAlign: "center",
