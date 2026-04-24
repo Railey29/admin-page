@@ -262,10 +262,10 @@ export default function RegisterPage({
             letterSpacing: "0.05em",
           }}
         >
-          LTO MID 2026
+          Registration Form
         </h1>
         <p style={{ color: "#9ca3af", marginTop: "4px", fontSize: "0.875rem" }}>
-          User Access Authorization System
+          LTO User Access Authorization Form
         </p>
       </div>
 
