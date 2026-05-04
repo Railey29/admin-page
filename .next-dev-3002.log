@@ -1,0 +1,116 @@
+
+> admin-page@0.1.0 dev
+> next dev --port 3002
+
+▲ Next.js 16.2.2 (Turbopack)
+- Local:         http://localhost:3002
+- Network:       http://192.168.8.199:3002
+- Environments: .env
+✓ Ready in 1131ms
+Creating turbopack project {
+  dir: 'C:\\Users\\jojopc\\Desktop\\Soco-Client\\admin-page',
+  testMode: true
+}
+
+ GET / 200 in 607ms (next.js: 290ms, application-code: 316ms)
+ GET / 200 in 333ms (next.js: 57ms, application-code: 277ms)
+ GET / 200 in 77ms (next.js: 9ms, application-code: 68ms)
+ POST /api/login 200 in 518ms (next.js: 476ms, application-code: 42ms)
+ GET /api/submissions 200 in 9.9s (next.js: 95ms, application-code: 9.8s)
+ GET /api/submissions 200 in 868ms (next.js: 5ms, application-code: 863ms)
+ POST /api/register 201 in 4.3s (next.js: 58ms, application-code: 4.3s)
+ POST /api/login 200 in 1532ms (next.js: 5ms, application-code: 1527ms)
+ GET /api/submissions 200 in 3.7s (next.js: 4ms, application-code: 3.7s)
+ GET /api/submissions 200 in 1242ms (next.js: 10ms, application-code: 1232ms)
+✓ Compiled in 182ms
+✓ Compiled in 156ms
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET / 200 in 780ms (next.js: 413ms, application-code: 367ms)
+✓ Compiled in 177ms
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET / 200 in 477ms (next.js: 168ms, application-code: 310ms)
+✓ Compiled in 260ms
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET / 200 in 810ms (next.js: 153ms, application-code: 657ms)
+[browser] Uncaught ReferenceError: filterLabels is not defined
+    at Level1to3Dashboard (app/components/form/Level1to3Dashboard.tsx:430:72)
+    at Dashboard (app/components/form/Dashboard.tsx:15:10)
+    at Home (app/page.tsx:21:10)
+  428 | ...earchedPending}
+  429 | ...`submissions-level${admin.level}-${filter}`}
+> 430 | ...`UAA Submissions — Level ${admin.level} (${filterLabels[filter]})`}
+      |                                             ^
+  431 | ...
+  432 | ...
+  433 | ...
+ GET / 200 in 88ms (next.js: 11ms, application-code: 77ms)
+[browser] Uncaught ReferenceError: filterLabels is not defined
+    at Level1to3Dashboard (app/components/form/Level1to3Dashboard.tsx:430:72)
+    at Dashboard (app/components/form/Dashboard.tsx:15:10)
+    at Home (app/page.tsx:21:10)
+  428 | ...earchedPending}
+  429 | ...`submissions-level${admin.level}-${filter}`}
+> 430 | ...`UAA Submissions — Level ${admin.level} (${filterLabels[filter]})`}
+      |                                             ^
+  431 | ...
+  432 | ...
+  433 | ...
+ GET / 200 in 219ms (next.js: 8ms, application-code: 210ms)
+[browser] Uncaught ReferenceError: filterLabels is not defined
+    at Level1to3Dashboard (app/components/form/Level1to3Dashboard.tsx:430:72)
+    at Dashboard (app/components/form/Dashboard.tsx:15:10)
+    at Home (app/page.tsx:21:10)
+  428 | ...earchedPending}
+  429 | ...`submissions-level${admin.level}-${filter}`}
+> 430 | ...`UAA Submissions — Level ${admin.level} (${filterLabels[filter]})`}
+      |                                             ^
+  431 | ...
+  432 | ...
+  433 | ...
+ GET / 200 in 244ms (next.js: 7ms, application-code: 237ms)
+[browser] Uncaught ReferenceError: filterLabels is not defined
+    at Level1to3Dashboard (app/components/form/Level1to3Dashboard.tsx:430:72)
+    at Dashboard (app/components/form/Dashboard.tsx:15:10)
+    at Home (app/page.tsx:21:10)
+  428 | ...earchedPending}
+  429 | ...`submissions-level${admin.level}-${filter}`}
+> 430 | ...`UAA Submissions — Level ${admin.level} (${filterLabels[filter]})`}
+      |                                             ^
+  431 | ...
+  432 | ...
+  433 | ...
+✓ Compiled in 238ms
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET / 200 in 485ms (next.js: 189ms, application-code: 296ms)
+ GET /api/submissions 200 in 13.8s (next.js: 5ms, application-code: 13.8s)
+ GET /api/submissions 200 in 1127ms (next.js: 4ms, application-code: 1124ms)
+✓ Compiled in 419ms
+ GET /api/submissions 200 in 1333ms (next.js: 5ms, application-code: 1328ms)
+✓ Compiled in 134ms
+ GET /api/submissions 200 in 9.0s (next.js: 5ms, application-code: 9.0s)
+✓ Compiled in 360ms
+✓ Compiled in 205ms
+✓ Compiled in 261ms
+✓ Compiled in 331ms
+ GET /api/submissions 200 in 3.8s (next.js: 7ms, application-code: 3.8s)
+ GET / 200 in 1591ms (next.js: 479ms, application-code: 1112ms)
+✓ Compiled in 1471ms
+✓ Compiled in 326ms
+ GET /api/submissions 200 in 9.8s (next.js: 5ms, application-code: 9.8s)
+ GET /api/submissions 200 in 5.9s (next.js: 4ms, application-code: 5.9s)
+✓ Compiled in 128ms
+ GET /api/submissions 200 in 1270ms (next.js: 4ms, application-code: 1266ms)
+✓ Compiled in 191ms
+ GET /api/submissions 200 in 4.2s (next.js: 3ms, application-code: 4.2s)
+✓ Compiled in 179ms
+ GET /api/submissions 200 in 6.2s (next.js: 5ms, application-code: 6.2s)
+✓ Compiled in 215ms
+✓ Compiled in 121ms
+✓ Compiled in 106ms
+✓ Compiled in 175ms
+ GET / 200 in 598ms (next.js: 235ms, application-code: 362ms)
+ GET /api/submissions 200 in 4.9s (next.js: 30ms, application-code: 4.8s)
+ GET /api/submissions 200 in 798ms (next.js: 4ms, application-code: 794ms)
+✓ Compiled in 380ms
+✓ Compiled in 250ms
+ GET / 200 in 514ms (next.js: 273ms, application-code: 242ms)

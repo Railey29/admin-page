@@ -14,6 +14,7 @@ interface RegisterPageProps {
     password: string;
   }) => boolean | Promise<boolean>;
   onBackToLogin?: () => void;
+  variant?: "standalone" | "embedded";
 }
 
 const DESIGNATION_OPTIONS = [
@@ -73,6 +74,7 @@ function getErrorFields(errorMsg: string): string[] {
 export default function RegisterPage({
   onRegister,
   onBackToLogin,
+  variant = "standalone",
 }: RegisterPageProps) {
   const [form, setForm] = useState({
     ltoEmployeeNumber: "",
@@ -93,9 +95,9 @@ export default function RegisterPage({
   const [isLoading, setIsLoading] = useState(false);
 
   const errorRef = useRef<HTMLDivElement>(null);
-  const fieldRefs = useRef<Record<string, HTMLElement | null>>({});
+  const fieldRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  const setFieldRef = (name: string) => (el: HTMLElement | null) => {
+  const setFieldRef = (name: string) => (el: HTMLDivElement | null) => {
     fieldRefs.current[name] = el;
   };
 
@@ -208,6 +210,7 @@ export default function RegisterPage({
   };
 
   const fieldStyle: React.CSSProperties = { marginBottom: "18px" };
+  const isEmbedded = variant === "embedded";
 
   const textFields: {
     label: string;
@@ -242,13 +245,13 @@ export default function RegisterPage({
   return (
     <div
       style={{
-        minHeight: "100vh",
+        minHeight: isEmbedded ? "auto" : "100vh",
         backgroundColor: "#f3f4f6",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        justifyContent: "center",
-        padding: "40px 16px",
+        justifyContent: isEmbedded ? "flex-start" : "center",
+        padding: isEmbedded ? "0" : "40px 16px",
         fontFamily: "system-ui, -apple-system, sans-serif",
       }}
     >
@@ -262,7 +265,7 @@ export default function RegisterPage({
             letterSpacing: "0.05em",
           }}
         >
-          Registration Form
+          Register Admin Account
         </h1>
         <p style={{ color: "#9ca3af", marginTop: "4px", fontSize: "0.875rem" }}>
           LTO User Access Authorization Form
@@ -297,7 +300,7 @@ export default function RegisterPage({
             marginBottom: "28px",
           }}
         >
-          Fill in your details to create your admin account.
+          Fill in the details for the Level 1 to Level 3 admin account.
         </p>
 
         <form onSubmit={handleSubmit}>
@@ -306,7 +309,7 @@ export default function RegisterPage({
             <div
               key={field.name}
               style={fieldStyle}
-              ref={setFieldRef(field.name) as any}
+              ref={setFieldRef(field.name)}
             >
               <label style={labelStyle}>
                 {field.label}
@@ -358,7 +361,7 @@ export default function RegisterPage({
           ))}
 
           {/* Designation / Office dropdown */}
-          <div style={fieldStyle} ref={setFieldRef("level") as any}>
+          <div style={fieldStyle} ref={setFieldRef("level")}>
             <label style={labelStyle}>Designation / Office</label>
             <select
               name="level"
@@ -386,7 +389,7 @@ export default function RegisterPage({
                   e.target.style.borderColor = "#e5e7eb";
               }}
             >
-              {DESIGNATION_OPTIONS.map((opt) => (
+              {DESIGNATION_OPTIONS.filter((opt) => opt.value !== "4").map((opt) => (
                 <option
                   key={opt.value}
                   value={opt.value}
@@ -421,16 +424,13 @@ export default function RegisterPage({
                 }}
               >
                 ℹ️ You will be assigned to the{" "}
-                {form.level === "4"
-                  ? "Level 4 Implementor"
-                  : `Level ${form.level}`}{" "}
-                dashboard upon login.
+                Level {form.level} dashboard upon login.
               </p>
             )}
           </div>
 
           {/* Password */}
-          <div style={fieldStyle} ref={setFieldRef("password") as any}>
+          <div style={fieldStyle} ref={setFieldRef("password")}>
             <label style={labelStyle}>Password</label>
             <div style={{ position: "relative" }}>
               <input
@@ -485,7 +485,7 @@ export default function RegisterPage({
           </div>
 
           {/* Confirm Password */}
-          <div style={fieldStyle} ref={setFieldRef("confirmPassword") as any}>
+          <div style={fieldStyle} ref={setFieldRef("confirmPassword")}>
             <label style={labelStyle}>Confirm Password</label>
             <div style={{ position: "relative" }}>
               <input
@@ -598,32 +598,33 @@ export default function RegisterPage({
           </button>
         </form>
 
-        <p
-          style={{
-            textAlign: "center",
-            color: "#9ca3af",
-            fontSize: "0.75rem",
-            marginTop: "20px",
-          }}
-        >
-          Already have an account?{" "}
-          <button
-            onClick={onBackToLogin}
+        {onBackToLogin && (
+          <p
             style={{
-              background: "none",
-              border: "none",
-              color: "#1e3a8a",
-              fontWeight: 600,
+              textAlign: "center",
+              color: "#9ca3af",
               fontSize: "0.75rem",
-              cursor: "pointer",
-              padding: 0,
-              textDecoration: "underline",
-              textUnderlineOffset: "2px",
+              marginTop: "20px",
             }}
           >
-            Sign In
-          </button>
-        </p>
+            <button
+              onClick={onBackToLogin}
+              style={{
+                background: "none",
+                border: "none",
+                color: "#1e3a8a",
+                fontWeight: 600,
+                fontSize: "0.75rem",
+                cursor: "pointer",
+                padding: 0,
+                textDecoration: "underline",
+                textUnderlineOffset: "2px",
+              }}
+            >
+              Back to dashboard
+            </button>
+          </p>
+        )}
       </div>
     </div>
   );

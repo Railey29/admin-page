@@ -1,16 +1,87 @@
 "use client";
-import { useState } from "react";
+import type { CSSProperties } from "react";
+import { useEffect, useState } from "react";
 import { AdminCredential } from "../../models/authModel";
 import { useSubmissions, SubmissionRecord } from "../../hooks/useSubmissions";
 import { EmailPayload } from "../../models/emailModel";
 import ExportButtons from "../ui/ExportButtons";
+import RegisterPage from "./RegisterPage";
 
 interface Props {
   admin: AdminCredential;
   onLogout: () => void;
 }
 
-type Tab = "toProcess" | "done" | "issues";
+type Tab = "toProcess" | "done" | "issues" | "register" | "reports";
+type SubmissionWithApprovers = SubmissionRecord & {
+  approved_by_l1_name?: string | null;
+  approved_by_l2_name?: string | null;
+  approved_by_l3_name?: string | null;
+  approved_by_l4_name?: string | null;
+};
+type DateFilter = "today" | "thisWeek" | "thisMonth" | "thisYear" | "allTime";
+const PAGE_SIZE = 4;
+
+const dateFilterLabels: Record<DateFilter, string> = {
+  today: "Today",
+  thisWeek: "This Week",
+  thisMonth: "This Month",
+  thisYear: "This Year",
+  allTime: "All Time",
+};
+
+const dateFilters: DateFilter[] = [
+  "today",
+  "thisWeek",
+  "thisMonth",
+  "thisYear",
+  "allTime",
+];
+
+function startOfDay(date: Date) {
+  const copy = new Date(date);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
+}
+
+function isWithinDateFilter(submittedAt: string | null, filter: DateFilter) {
+  if (filter === "allTime") return true;
+  if (!submittedAt) return false;
+
+  const submittedDate = new Date(submittedAt);
+  const now = new Date();
+
+  if (filter === "today") {
+    return startOfDay(submittedDate).getTime() === startOfDay(now).getTime();
+  }
+
+  if (filter === "thisWeek") {
+    const startOfWeek = startOfDay(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    return submittedDate >= startOfWeek;
+  }
+
+  if (filter === "thisMonth") {
+    return (
+      submittedDate.getMonth() === now.getMonth() &&
+      submittedDate.getFullYear() === now.getFullYear()
+    );
+  }
+
+  return submittedDate.getFullYear() === now.getFullYear();
+}
+
+function sortByFifoDate(records: SubmissionRecord[]) {
+  return [...records].sort((a, b) => {
+    const aTime = a.submitted_at
+      ? new Date(a.submitted_at).getTime()
+      : Infinity;
+    const bTime = b.submitted_at
+      ? new Date(b.submitted_at).getTime()
+      : Infinity;
+    return aTime - bTime;
+  });
+}
 
 async function sendStatusEmail(payload: EmailPayload) {
   try {
@@ -33,8 +104,64 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
   } | null>(null);
   const [comment, setComment] = useState("");
   const [sending, setSending] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [dateFilter, setDateFilter] = useState<DateFilter>("thisWeek");
+  const [page, setPage] = useState(1);
+  const [priorityPage, setPriorityPage] = useState(1);
+  const [reportPage, setReportPage] = useState(1);
+  const [reportPriorityPage, setReportPriorityPage] = useState(1);
+  const [priorityIds, setPriorityIds] = useState<Set<number>>(new Set());
 
   const { submissions, loading, approve, reject } = useSubmissions(4);
+  const priorityStorageKey = "lto_priority_level_4";
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(priorityStorageKey);
+      if (stored) setPriorityIds(new Set(JSON.parse(stored)));
+    } catch {
+      localStorage.removeItem(priorityStorageKey);
+    }
+  }, [priorityStorageKey]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      priorityStorageKey,
+      JSON.stringify(Array.from(priorityIds)),
+    );
+  }, [priorityIds, priorityStorageKey]);
+
+  const handleRegisterAccount = async (data: {
+    ltoEmployeeNumber: string;
+    firstName: string;
+    middleName: string;
+    lastName: string;
+    office: string;
+    designation: string;
+    level: number;
+    username: string;
+    password: string;
+  }) => {
+    try {
+      const res = await fetch("/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        console.error("Registration failed:", err.error);
+        return false;
+      }
+
+      setTab("toProcess");
+      return true;
+    } catch (err) {
+      console.error("Network error:", err);
+      return false;
+    }
+  };
 
   const toProcess = submissions.filter(
     (r) =>
@@ -94,11 +221,105 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
 
   const currentList =
     tab === "toProcess" ? toProcess : tab === "done" ? done : issues;
+  const getApplicantName = (record: SubmissionRecord) => {
+    const userInfo = record.uaa_user_info[0];
+    return userInfo
+      ? `${userInfo.last_name ?? ""}, ${userInfo.first_name ?? ""} ${userInfo.middle_name ?? ""}`.trim()
+      : "";
+  };
+  const dateFilteredList = sortByFifoDate(
+    currentList.filter((record) =>
+      isWithinDateFilter(record.submitted_at, dateFilter),
+    ),
+  );
+  const allFilteredList = dateFilteredList.filter((record) => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return true;
+    return (
+      getApplicantName(record).toLowerCase().includes(query) ||
+      (record.office_code ?? "").toLowerCase().includes(query)
+    );
+  });
+  const priorityList =
+    tab === "toProcess"
+      ? allFilteredList.filter((record) => priorityIds.has(record.id))
+      : [];
+  const filteredList =
+    tab === "toProcess"
+      ? allFilteredList.filter((record) => !priorityIds.has(record.id))
+      : allFilteredList;
+  const reportList = sortByFifoDate(
+    submissions.filter((record) =>
+      isWithinDateFilter(record.submitted_at, dateFilter),
+    ),
+  );
+  const searchedReports = reportList.filter((record) => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return true;
+    return (
+      getApplicantName(record).toLowerCase().includes(query) ||
+      (record.office_code ?? "").toLowerCase().includes(query)
+    );
+  });
+  const reportPriorityList = searchedReports.filter((record) =>
+    priorityIds.has(record.id),
+  );
+  const reportNonPriorityList = searchedReports.filter(
+    (record) => !priorityIds.has(record.id),
+  );
+  const reportPriorityCount = reportPriorityList.length;
+  const reportPriorityPageCount = Math.max(
+    1,
+    Math.ceil(reportPriorityList.length / PAGE_SIZE),
+  );
+  const pagedReportPriority = reportPriorityList.slice(
+    (reportPriorityPage - 1) * PAGE_SIZE,
+    reportPriorityPage * PAGE_SIZE,
+  );
+  const reportPageCount = Math.max(
+    1,
+    Math.ceil(reportNonPriorityList.length / PAGE_SIZE),
+  );
+  const pagedReports = reportNonPriorityList.slice(
+    (reportPage - 1) * PAGE_SIZE,
+    reportPage * PAGE_SIZE,
+  );
+  const priorityPageCount = Math.max(
+    1,
+    Math.ceil(priorityList.length / PAGE_SIZE),
+  );
+  const pagedPriority = priorityList.slice(
+    (priorityPage - 1) * PAGE_SIZE,
+    priorityPage * PAGE_SIZE,
+  );
+  const pageCount = Math.max(1, Math.ceil(filteredList.length / PAGE_SIZE));
+  const pagedList = filteredList.slice(
+    (page - 1) * PAGE_SIZE,
+    page * PAGE_SIZE,
+  );
+
+  const togglePriority = (id: number) => {
+    setPriorityIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+    setPage(1);
+    setPriorityPage(1);
+    setReportPage(1);
+    setReportPriorityPage(1);
+  };
 
   const tabs: { key: Tab; icon: string; label: string }[] = [
     { key: "toProcess", icon: "📋", label: "To Process" },
     { key: "done", icon: "✅", label: "Done" },
     { key: "issues", icon: "❌", label: "Issues" },
+    { key: "reports", icon: "📊", label: "Reports" },
+    { key: "register", icon: "+", label: "Register Account" },
   ];
 
   return (
@@ -175,7 +396,12 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
         {tabs.map((t) => (
           <button
             key={t.key}
-            onClick={() => setTab(t.key)}
+            onClick={() => {
+              setTab(t.key);
+              setPage(1);
+              setPriorityPage(1);
+              setReportPage(1);
+            }}
             style={{
               padding: "12px 4px",
               fontSize: "0.875rem",
@@ -195,321 +421,707 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
       </div>
 
       <main style={{ padding: "24px", maxWidth: 1100, margin: "0 auto" }}>
-        {/* ── STAT CARDS ── */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(3,1fr)",
-            gap: 16,
-            marginBottom: 24,
-          }}
-        >
-          <StatCard
-            value={toProcess.length}
-            label="TO PROCESS"
-            borderColor="#f97316"
-            bgColor="#fff7ed"
-            numColor="#f97316"
-            icon="📋"
+        {tab === "register" ? (
+          <RegisterPage
+            variant="embedded"
+            onRegister={handleRegisterAccount}
+            onBackToLogin={() => setTab("toProcess")}
           />
-          <StatCard
-            value={done.length}
-            label="DONE"
-            borderColor="#16a34a"
-            bgColor="#f0fdf4"
-            numColor="#16a34a"
-            icon="✅"
-          />
-          <StatCard
-            value={issues.length}
-            label="ISSUES"
-            borderColor="#ef4444"
-            bgColor="#fef2f2"
-            numColor="#ef4444"
-            icon="❌"
-          />
-        </div>
-
-        {/* ── TABLE CARD ── */}
-        <div
-          style={{
-            backgroundColor: "#fff",
-            borderRadius: 12,
-            border: "1px solid #e5e7eb",
-            overflow: "hidden",
-          }}
-        >
-          <div
-            style={{
-              padding: "16px 20px",
-              borderBottom: "1px solid #f3f4f6",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 8,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontWeight: 600, color: "#111827" }}>
-                {tab === "toProcess" && "📋 Requests to Process"}
-                {tab === "done" && "✅ Processed Requests"}
-                {tab === "issues" && "❌ Rejected / Issues"}
-              </span>
-              {tab === "toProcess" && toProcess.length > 0 && (
-                <span
-                  style={{
-                    fontSize: "0.7rem",
-                    backgroundColor: "#ffedd5",
-                    color: "#c2410c",
-                    fontWeight: 700,
-                    padding: "2px 8px",
-                    borderRadius: 999,
-                  }}
-                >
-                  {toProcess.length}
-                </span>
-              )}
-            </div>
-            <ExportButtons
-              records={currentList}
-              filename={`l4-${tab}`}
-              pdfTitle={`Level 4 — ${tab === "toProcess" ? "To Process" : tab === "done" ? "Processed" : "Issues"}`}
-            />
-          </div>
-
-          {tab === "toProcess" && (
+        ) : (
+          <>
+            {/* ── STAT CARDS ── */}
             <div
               style={{
-                fontSize: "0.75rem",
-                color: "#9ca3af",
-                padding: "8px 20px",
-                borderBottom: "1px solid #f9fafb",
+                display: "grid",
+                gridTemplateColumns: "repeat(3,1fr)",
+                gap: 16,
+                marginBottom: 24,
               }}
             >
-              Approved by Level 1 and at least one of Level 2 or Level 3 — ready
-              for implementation.
+              <StatCard
+                value={toProcess.length}
+                label="TO PROCESS"
+                borderColor="#f97316"
+                bgColor="#fff7ed"
+                numColor="#f97316"
+                icon="📋"
+              />
+              <StatCard
+                value={done.length}
+                label="DONE"
+                borderColor="#16a34a"
+                bgColor="#f0fdf4"
+                numColor="#16a34a"
+                icon="✅"
+              />
+              <StatCard
+                value={issues.length}
+                label="ISSUES"
+                borderColor="#ef4444"
+                bgColor="#fef2f2"
+                numColor="#ef4444"
+                icon="❌"
+              />
             </div>
-          )}
 
-          {loading ? (
+            {/* ── TABLE CARD ── */}
             <div
               style={{
-                padding: "40px 20px",
-                textAlign: "center",
-                color: "#9ca3af",
-                fontSize: "0.875rem",
+                backgroundColor: "#fff",
+                borderRadius: 12,
+                border: "1px solid #e5e7eb",
+                overflow: "hidden",
               }}
             >
-              Loading submissions...
-            </div>
-          ) : currentList.length === 0 ? (
-            <div
-              style={{
-                padding: "40px 20px",
-                textAlign: "center",
-                color: "#9ca3af",
-                fontSize: "0.875rem",
-              }}
-            >
-              {tab === "toProcess"
-                ? "No requests waiting to be processed."
-                : tab === "done"
-                  ? "No processed requests yet."
-                  : "No issues found."}
-            </div>
-          ) : (
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                fontSize: "0.875rem",
-              }}
-            >
-              <thead>
-                <tr
-                  style={{
-                    backgroundColor: "#f9fafb",
-                    borderBottom: "1px solid #f3f4f6",
-                  }}
-                >
-                  {[
-                    "APPLICANT",
-                    tab === "toProcess" ? "DATE APPROVED" : "DATE",
-                    "OFFICE CODE",
-                    "ACCOUNT TYPE",
-                    "MODULES",
-                    "ACTIONS",
-                  ].map((h) => (
-                    <th
-                      key={h}
+              <div
+                style={{
+                  padding: "16px 20px",
+                  borderBottom: "1px solid #f3f4f6",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 8,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontWeight: 600, color: "#111827" }}>
+                    {tab === "toProcess" && "📋 Requests to Process"}
+                    {tab === "done" && "✅ Processed Requests"}
+                    {tab === "issues" && "❌ Rejected / Issues"}
+                    {tab === "reports" && "📊 Reports"}
+                  </span>
+                  {tab === "toProcess" && toProcess.length > 0 && (
+                    <span
                       style={{
-                        textAlign: "left",
-                        padding: "10px 20px",
                         fontSize: "0.7rem",
-                        fontWeight: 600,
-                        color: "#6b7280",
-                        letterSpacing: "0.05em",
+                        backgroundColor: "#ffedd5",
+                        color: "#c2410c",
+                        fontWeight: 700,
+                        padding: "2px 8px",
+                        borderRadius: 999,
                       }}
                     >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {currentList.map((req, i) => {
-                  const userInfo = req.uaa_user_info[0];
-                  const sysAccess = req.uaa_system_access[0];
-                  const modules = req.uaa_modules[0];
-                  const fullName = userInfo
-                    ? `${userInfo.last_name}, ${userInfo.first_name} ${userInfo.middle_name ?? ""}`.trim()
-                    : "—";
-                  const moduleList = modules?.selected_modules ?? [];
-
-                  return (
-                    <tr
-                      key={req.id}
+                      {toProcess.length}
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {dateFilters.map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => {
+                        setDateFilter(f);
+                        setPage(1);
+                        setPriorityPage(1);
+                        setReportPage(1);
+                      }}
                       style={{
-                        borderBottom: "1px solid #f9fafb",
-                        backgroundColor: i % 2 === 0 ? "#fff" : "#fafafa",
+                        fontSize: "0.75rem",
+                        padding: "6px 12px",
+                        borderRadius: 6,
+                        cursor: "pointer",
+                        border: "1px solid",
+                        transition: "all 0.15s",
+                        backgroundColor: dateFilter === f ? "#1e3a8a" : "#fff",
+                        color: dateFilter === f ? "#fff" : "#6b7280",
+                        borderColor: dateFilter === f ? "#1e3a8a" : "#d1d5db",
                       }}
                     >
-                      <td style={{ padding: "14px 20px" }}>
-                        <div style={{ fontWeight: 600, color: "#111827" }}>
-                          {fullName}
-                        </div>
-                        <div
+                      {dateFilterLabels[f]}
+                    </button>
+                  ))}
+                </div>
+                <ExportButtons
+                  records={
+                    tab === "reports"
+                      ? searchedReports
+                      : [...priorityList, ...filteredList]
+                  }
+                  filename={
+                    tab === "reports"
+                      ? `l4-reports-${dateFilter}`
+                      : `l4-${tab}-${dateFilter}`
+                  }
+                  pdfTitle={
+                    tab === "reports"
+                      ? `Level 4 — Reports (${dateFilterLabels[dateFilter]})`
+                      : `Level 4 — ${tab === "toProcess" ? "To Process" : tab === "done" ? "Processed" : "Issues"} (${dateFilterLabels[dateFilter]})`
+                  }
+                />
+                <SearchBox
+                  value={searchTerm}
+                  onChange={(value) => {
+                    setSearchTerm(value);
+                    setPage(1);
+                    setPriorityPage(1);
+                    setReportPage(1);
+                  }}
+                />
+              </div>
+
+              {tab === "toProcess" && (
+                <div
+                  style={{
+                    fontSize: "0.75rem",
+                    color: "#9ca3af",
+                    padding: "8px 20px",
+                    borderBottom: "1px solid #f9fafb",
+                  }}
+                >
+                  Approved by Level 1 and at least one of Level 2 or Level 3 —
+                  ready for implementation.
+                </div>
+              )}
+
+              {tab === "toProcess" && (
+                <div
+                  style={{
+                    borderBottom: "1px solid #f3f4f6",
+                    backgroundColor: "#fffbeb",
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: "14px 20px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      borderBottom:
+                        priorityList.length > 0 ? "1px solid #fde68a" : "none",
+                    }}
+                  >
+                    <span style={{ fontWeight: 700, color: "#92400e" }}>
+                      ⭐ Priority Requests
+                    </span>
+                    <span style={{ fontSize: "0.75rem", color: "#b45309" }}>
+                      {priorityList.length} prioritized
+                    </span>
+                  </div>
+                  {priorityList.length === 0 ? (
+                    <div
+                      style={{
+                        padding: "0 20px 16px",
+                        color: "#b45309",
+                        fontSize: "0.875rem",
+                      }}
+                    >
+                      Click the star beside Mark Done/Flag Issue to move a
+                      request here.
+                    </div>
+                  ) : (
+                    <>
+                      <PriorityTable
+                        records={pagedPriority}
+                        onView={setViewModal}
+                        onDone={(record) => openCommentModal(record, "done")}
+                        onIssue={(record) => openCommentModal(record, "issue")}
+                        onTogglePriority={togglePriority}
+                        priorityIds={priorityIds}
+                      />
+                      <Pagination
+                        page={priorityPage}
+                        pageCount={priorityPageCount}
+                        total={priorityList.length}
+                        onPageChange={setPriorityPage}
+                      />
+                    </>
+                  )}
+                </div>
+              )}
+
+              {tab === "reports" ? (
+                <div>
+                  {reportPriorityCount > 0 && (
+                    <div
+                      style={{
+                        backgroundColor: "#fff",
+                        borderRadius: 12,
+                        border: "1px solid #fde68a",
+                        overflow: "hidden",
+                        marginBottom: 16,
+                      }}
+                    >
+                      <div
+                        style={{
+                          padding: "14px 20px",
+                          borderBottom: "1px solid #fef3c7",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          backgroundColor: "#fffbeb",
+                        }}
+                      >
+                        <span style={{ fontWeight: 700, color: "#92400e" }}>
+                          ⭐ Priority Requests
+                        </span>
+                        <span style={{ fontSize: "0.75rem", color: "#b45309" }}>
+                          {reportPriorityCount} prioritized
+                        </span>
+                      </div>
+                      <div style={{ padding: "16px 20px" }}>
+                        <PriorityTable
+                          records={pagedReportPriority}
+                          onView={setViewModal}
+                          onDone={(record) => openCommentModal(record, "done")}
+                          onIssue={(record) =>
+                            openCommentModal(record, "issue")
+                          }
+                          onTogglePriority={togglePriority}
+                          priorityIds={priorityIds}
+                        />
+                        <Pagination
+                          page={reportPriorityPage}
+                          pageCount={reportPriorityPageCount}
+                          total={reportPriorityCount}
+                          onPageChange={setReportPriorityPage}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {loading && (
+                    <div
+                      style={{
+                        padding: "40px 20px",
+                        textAlign: "center",
+                        color: "#9ca3af",
+                        fontSize: "0.875rem",
+                      }}
+                    >
+                      Loading report submissions...
+                    </div>
+                  )}
+                  {!loading && reportNonPriorityList.length === 0 && (
+                    <div
+                      style={{
+                        padding: "40px 20px",
+                        textAlign: "center",
+                        color: "#9ca3af",
+                        fontSize: "0.875rem",
+                      }}
+                    >
+                      No submissions match your search.
+                    </div>
+                  )}
+                  {!loading && reportNonPriorityList.length > 0 && (
+                    <table
+                      style={{
+                        width: "100%",
+                        borderCollapse: "collapse",
+                        fontSize: "0.875rem",
+                      }}
+                    >
+                      <thead>
+                        <tr
                           style={{
-                            fontSize: "0.75rem",
-                            color: "#9ca3af",
-                            marginTop: 2,
+                            backgroundColor: "#f9fafb",
+                            borderBottom: "1px solid #f3f4f6",
                           }}
                         >
-                          {userInfo?.designation ?? "—"} •{" "}
-                          {userInfo?.employee_id ?? "—"}
-                        </div>
-                      </td>
-                      <td style={{ padding: "14px 20px", color: "#4b5563" }}>
-                        {req.submitted_at
-                          ? new Date(req.submitted_at).toLocaleDateString(
-                              "en-US",
-                              {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              },
-                            )
-                          : "—"}
-                      </td>
-                      <td style={{ padding: "14px 20px", color: "#4b5563" }}>
-                        {req.office_code ?? "—"}
-                      </td>
-                      <td style={{ padding: "14px 20px", color: "#4b5563" }}>
-                        {sysAccess?.account_type ?? "—"}
-                      </td>
-                      <td style={{ padding: "14px 20px" }}>
-                        {moduleList.length > 0 ? (
-                          <span
-                            style={{ fontSize: "0.75rem", color: "#6b7280" }}
+                          {[
+                            "TRACKING ID",
+                            "APPLICANT",
+                            "OFFICE CODE",
+                            "ACCOUNT TYPE",
+                            "DATE",
+                            "STATUS",
+                            "ACTIONS",
+                          ].map((h) => (
+                            <th
+                              key={h}
+                              style={{
+                                textAlign: "left",
+                                padding: "10px 20px",
+                                fontSize: "0.7rem",
+                                fontWeight: 600,
+                                color: "#6b7280",
+                                letterSpacing: "0.05em",
+                              }}
+                            >
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pagedReports.map((req, i) => {
+                          const userInfo = req.uaa_user_info[0];
+                          const sysAccess = req.uaa_system_access[0];
+                          const fullName = userInfo
+                            ? `${userInfo.last_name}, ${userInfo.first_name} ${userInfo.middle_name ?? ""}`.trim()
+                            : "—";
+                          const isRejected = req.status === "Rejected";
+                          const isProcessed = req.approved_by_l4;
+                          return (
+                            <tr
+                              key={req.id}
+                              style={{
+                                borderBottom: "1px solid #f9fafb",
+                                backgroundColor:
+                                  i % 2 === 0 ? "#fff" : "#fafafa",
+                              }}
+                            >
+                              <td
+                                style={{
+                                  padding: "12px 20px",
+                                  color: "#6b7280",
+                                  fontSize: "0.8rem",
+                                }}
+                              >
+                                {req.tracking_id}
+                              </td>
+                              <td
+                                style={{
+                                  padding: "12px 20px",
+                                  fontWeight: 600,
+                                  color: "#111827",
+                                }}
+                              >
+                                {fullName}
+                              </td>
+                              <td
+                                style={{
+                                  padding: "12px 20px",
+                                  color: "#4b5563",
+                                }}
+                              >
+                                {req.office_code ?? "—"}
+                              </td>
+                              <td
+                                style={{
+                                  padding: "12px 20px",
+                                  color: "#4b5563",
+                                }}
+                              >
+                                {sysAccess?.account_type ?? "—"}
+                              </td>
+                              <td
+                                style={{
+                                  padding: "12px 20px",
+                                  color: "#4b5563",
+                                }}
+                              >
+                                {req.submitted_at
+                                  ? new Date(
+                                      req.submitted_at,
+                                    ).toLocaleDateString("en-US", {
+                                      month: "short",
+                                      day: "numeric",
+                                      year: "numeric",
+                                    })
+                                  : "—"}
+                              </td>
+                              <td style={{ padding: "12px 20px" }}>
+                                <span
+                                  style={{
+                                    fontSize: "0.75rem",
+                                    fontWeight: 500,
+                                    padding: "3px 10px",
+                                    borderRadius: 999,
+                                    backgroundColor: isRejected
+                                      ? "#fef2f2"
+                                      : isProcessed
+                                        ? "#f0fdf4"
+                                        : "#fff7ed",
+                                    color: isRejected
+                                      ? "#ef4444"
+                                      : isProcessed
+                                        ? "#16a34a"
+                                        : "#f97316",
+                                  }}
+                                >
+                                  {isRejected
+                                    ? "❌ Rejected"
+                                    : isProcessed
+                                      ? "✅ Processed"
+                                      : "⏳ Pending"}
+                                </span>
+                              </td>
+                              <td style={{ padding: "14px 20px" }}>
+                                <ActionBtn
+                                  onClick={() => togglePriority(req.id)}
+                                  color={
+                                    priorityIds.has(req.id)
+                                      ? "#d97706"
+                                      : "#6b7280"
+                                  }
+                                  borderColor={
+                                    priorityIds.has(req.id)
+                                      ? "#f59e0b"
+                                      : "#d1d5db"
+                                  }
+                                  label={
+                                    priorityIds.has(req.id)
+                                      ? "★ Unpriority"
+                                      : "☆ Priority"
+                                  }
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              ) : loading ? (
+                <div
+                  style={{
+                    padding: "40px 20px",
+                    textAlign: "center",
+                    color: "#9ca3af",
+                    fontSize: "0.875rem",
+                  }}
+                >
+                  Loading submissions...
+                </div>
+              ) : filteredList.length === 0 ? (
+                <div
+                  style={{
+                    padding: "40px 20px",
+                    textAlign: "center",
+                    color: "#9ca3af",
+                    fontSize: "0.875rem",
+                  }}
+                >
+                  No requests match your search.
+                </div>
+              ) : (
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    fontSize: "0.875rem",
+                  }}
+                >
+                  <thead>
+                    <tr
+                      style={{
+                        backgroundColor: "#f9fafb",
+                        borderBottom: "1px solid #f3f4f6",
+                      }}
+                    >
+                      {[
+                        "APPLICANT",
+                        tab === "toProcess" ? "DATE APPROVED" : "DATE",
+                        "OFFICE CODE",
+                        "ACCOUNT TYPE",
+                        "MODULES",
+                        "ACTIONS",
+                      ].map((h) => (
+                        <th
+                          key={h}
+                          style={{
+                            textAlign: "left",
+                            padding: "10px 20px",
+                            fontSize: "0.7rem",
+                            fontWeight: 600,
+                            color: "#6b7280",
+                            letterSpacing: "0.05em",
+                          }}
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pagedList.map((req, i) => {
+                      const userInfo = req.uaa_user_info[0];
+                      const sysAccess = req.uaa_system_access[0];
+                      const modules = req.uaa_modules[0];
+                      const fullName = userInfo
+                        ? `${userInfo.last_name}, ${userInfo.first_name} ${userInfo.middle_name ?? ""}`.trim()
+                        : "—";
+                      const moduleList = modules?.selected_modules ?? [];
+
+                      return (
+                        <tr
+                          key={req.id}
+                          style={{
+                            borderBottom: "1px solid #f9fafb",
+                            backgroundColor: i % 2 === 0 ? "#fff" : "#fafafa",
+                          }}
+                        >
+                          <td style={{ padding: "14px 20px" }}>
+                            <div style={{ fontWeight: 600, color: "#111827" }}>
+                              {fullName}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: "0.75rem",
+                                color: "#9ca3af",
+                                marginTop: 2,
+                              }}
+                            >
+                              {userInfo?.designation ?? "—"} •{" "}
+                              {userInfo?.employee_id ?? "—"}
+                            </div>
+                          </td>
+                          <td
+                            style={{ padding: "14px 20px", color: "#4b5563" }}
                           >
-                            {moduleList.slice(0, 2).join(", ")}
-                            {moduleList.length > 2 && (
-                              <span style={{ color: "#3b82f6" }}>
-                                {" "}
-                                +{moduleList.length - 2} more
+                            {req.submitted_at
+                              ? new Date(req.submitted_at).toLocaleDateString(
+                                  "en-US",
+                                  {
+                                    month: "short",
+                                    day: "numeric",
+                                    year: "numeric",
+                                  },
+                                )
+                              : "—"}
+                          </td>
+                          <td
+                            style={{ padding: "14px 20px", color: "#4b5563" }}
+                          >
+                            {req.office_code ?? "—"}
+                          </td>
+                          <td
+                            style={{ padding: "14px 20px", color: "#4b5563" }}
+                          >
+                            {sysAccess?.account_type ?? "—"}
+                          </td>
+                          <td style={{ padding: "14px 20px" }}>
+                            {moduleList.length > 0 ? (
+                              <span
+                                style={{
+                                  fontSize: "0.75rem",
+                                  color: "#6b7280",
+                                }}
+                              >
+                                {moduleList.slice(0, 2).join(", ")}
+                                {moduleList.length > 2 && (
+                                  <span style={{ color: "#3b82f6" }}>
+                                    {" "}
+                                    +{moduleList.length - 2} more
+                                  </span>
+                                )}
+                              </span>
+                            ) : (
+                              <span
+                                style={{
+                                  fontSize: "0.75rem",
+                                  color: "#9ca3af",
+                                }}
+                              >
+                                —
                               </span>
                             )}
-                          </span>
-                        ) : (
-                          <span
-                            style={{ fontSize: "0.75rem", color: "#9ca3af" }}
-                          >
-                            —
-                          </span>
-                        )}
-                      </td>
-                      <td style={{ padding: "14px 20px" }}>
-                        <div
-                          style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
-                        >
-                          <ActionBtn
-                            onClick={() => setViewModal(req)}
-                            color="#6b7280"
-                            borderColor="#d1d5db"
-                            label="👁 View"
-                          />
-                          {tab === "toProcess" && (
-                            <>
-                              <ActionBtn
-                                onClick={() => openCommentModal(req, "done")}
-                                color="#16a34a"
-                                borderColor="#4ade80"
-                                label="✅ Mark Done"
-                              />
-                              <ActionBtn
-                                onClick={() => openCommentModal(req, "issue")}
-                                color="#ef4444"
-                                borderColor="#f87171"
-                                label="❌ Flag Issue"
-                              />
-                            </>
-                          )}
-                          {tab === "done" && (
-                            <span
+                          </td>
+                          <td style={{ padding: "14px 20px" }}>
+                            <div
                               style={{
-                                fontSize: "0.75rem",
-                                color: "#16a34a",
-                                fontWeight: 500,
-                                backgroundColor: "#f0fdf4",
-                                padding: "4px 10px",
-                                borderRadius: 8,
+                                display: "flex",
+                                gap: 8,
+                                flexWrap: "wrap",
                               }}
                             >
-                              ✅ Processed
-                            </span>
-                          )}
-                          {tab === "issues" && (
-                            <span
-                              style={{
-                                fontSize: "0.75rem",
-                                color: "#ef4444",
-                                fontWeight: 500,
-                                backgroundColor: "#fef2f2",
-                                padding: "4px 10px",
-                                borderRadius: 8,
-                              }}
-                            >
-                              ❌ Rejected
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
+                              <ActionBtn
+                                onClick={() => setViewModal(req)}
+                                color="#6b7280"
+                                borderColor="#d1d5db"
+                                label="👁 View"
+                              />
+                              {tab === "toProcess" && (
+                                <>
+                                  <ActionBtn
+                                    onClick={() =>
+                                      openCommentModal(req, "done")
+                                    }
+                                    color="#16a34a"
+                                    borderColor="#4ade80"
+                                    label="✅ Mark Done"
+                                  />
+                                  <ActionBtn
+                                    onClick={() =>
+                                      openCommentModal(req, "issue")
+                                    }
+                                    color="#ef4444"
+                                    borderColor="#f87171"
+                                    label="❌ Flag Issue"
+                                  />
+                                  <ActionBtn
+                                    onClick={() => togglePriority(req.id)}
+                                    color="#d97706"
+                                    borderColor="#f59e0b"
+                                    label={
+                                      priorityIds.has(req.id)
+                                        ? "★ Unpriority"
+                                        : "☆ Priority"
+                                    }
+                                  />
+                                </>
+                              )}
+                              {tab === "done" && (
+                                <span
+                                  style={{
+                                    fontSize: "0.75rem",
+                                    color: "#16a34a",
+                                    fontWeight: 500,
+                                    backgroundColor: "#f0fdf4",
+                                    padding: "4px 10px",
+                                    borderRadius: 8,
+                                  }}
+                                >
+                                  ✅ Processed
+                                </span>
+                              )}
+                              {tab === "issues" && (
+                                <span
+                                  style={{
+                                    fontSize: "0.75rem",
+                                    color: "#ef4444",
+                                    fontWeight: 500,
+                                    backgroundColor: "#fef2f2",
+                                    padding: "4px 10px",
+                                    borderRadius: 8,
+                                  }}
+                                >
+                                  ❌ Rejected
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+              {!loading && filteredList.length > 0 && (
+                <Pagination
+                  page={page}
+                  pageCount={pageCount}
+                  total={filteredList.length}
+                  onPageChange={setPage}
+                />
+              )}
+            </div>
 
-        {/* ── INFO BOX ── */}
-        <div
-          style={{
-            marginTop: 16,
-            backgroundColor: "#eff6ff",
-            border: "1px solid #dbeafe",
-            borderRadius: 12,
-            padding: "12px 20px",
-          }}
-        >
-          <span
-            style={{ fontSize: "0.75rem", color: "#1d4ed8", fontWeight: 500 }}
-          >
-            ℹ️ As Level 4 Implementor, you receive requests once Level 1 and at
-            least one of Level 2 or Level 3 have approved. An email notification
-            is sent to the applicant after each action.
-          </span>
-        </div>
+            {/* ── INFO BOX ── */}
+            <div
+              style={{
+                marginTop: 16,
+                backgroundColor: "#eff6ff",
+                border: "1px solid #dbeafe",
+                borderRadius: 12,
+                padding: "12px 20px",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "0.75rem",
+                  color: "#1d4ed8",
+                  fontWeight: 500,
+                }}
+              >
+                ℹ️ As Level 4 Implementor, you receive requests once Level 1 and
+                at least one of Level 2 or Level 3 have approved. An email
+                notification is sent to the applicant after each action.
+              </span>
+            </div>
+          </>
+        )}
       </main>
 
       {/* ── VIEW MODAL ── */}
@@ -540,6 +1152,7 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
             }}
           >
             {(() => {
+              const viewedRecord = viewModal as SubmissionWithApprovers;
               const userInfo = viewModal.uaa_user_info[0];
               const sysAccess = viewModal.uaa_system_access[0];
               const modules = viewModal.uaa_modules[0];
@@ -549,16 +1162,30 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
               const moduleList = modules?.selected_modules ?? [];
               const isRejected = viewModal.status === "Rejected";
 
-              const approvalSteps = [
+              const trailLevels = [
                 {
                   label: "Level 1 — Chief of Office",
                   approved: viewModal.approved_by_l1,
+                  shared: false,
+                  approverName: viewedRecord.approved_by_l1_name ?? null,
                 },
-                { label: "Level 2", approved: viewModal.approved_by_l2 },
-                { label: "Level 3", approved: viewModal.approved_by_l3 },
+                {
+                  label: "Level 2",
+                  approved: viewModal.approved_by_l2,
+                  shared: true,
+                  approverName: viewedRecord.approved_by_l2_name ?? null,
+                },
+                {
+                  label: "Level 3",
+                  approved: viewModal.approved_by_l3,
+                  shared: true,
+                  approverName: viewedRecord.approved_by_l3_name ?? null,
+                },
                 {
                   label: "Level 4 (Implementor)",
                   approved: viewModal.approved_by_l4,
+                  shared: false,
+                  approverName: viewedRecord.approved_by_l4_name ?? null,
                 },
               ];
 
@@ -762,76 +1389,114 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                       style={{
                         display: "flex",
                         flexDirection: "column",
-                        gap: 8,
+                        gap: 6,
                         marginBottom: 8,
                       }}
                     >
-                      {approvalSteps.map((step, i) => {
-                        const approved = step.approved;
-                        const dotColor = isRejected
-                          ? "#ef4444"
-                          : approved
-                            ? "#16a34a"
-                            : "#d1d5db";
-                        const statusLabel = isRejected
-                          ? "Rejected"
-                          : approved
-                            ? "Approved"
-                            : "Waiting";
-                        const statusIcon = isRejected
-                          ? "❌"
-                          : approved
-                            ? "✅"
-                            : "⏳";
-                        const statusColor = isRejected
-                          ? "#ef4444"
-                          : approved
-                            ? "#16a34a"
-                            : "#9ca3af";
+                      {trailLevels.map(
+                        ({ label, approved, shared, approverName }, idx) => {
+                          const gateClosedByOther =
+                            shared &&
+                            ((idx === 1 &&
+                              !viewModal.approved_by_l2 &&
+                              viewModal.approved_by_l3) ||
+                              (idx === 2 &&
+                                !viewModal.approved_by_l3 &&
+                                viewModal.approved_by_l2));
 
-                        return (
-                          <div
-                            key={i}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 12,
-                              backgroundColor: "#f9fafb",
-                              border: "1px solid #f3f4f6",
-                              borderRadius: 8,
-                              padding: "10px 14px",
-                            }}
-                          >
-                            <span
+                          let dotColor = "#d1d5db";
+                          let badgeBg = "#fff7ed";
+                          let badgeColor = "#f97316";
+                          let badgeText = "⏳ Waiting";
+
+                          if (isRejected) {
+                            dotColor = "#ef4444";
+                            badgeBg = "#fef2f2";
+                            badgeColor = "#ef4444";
+                            badgeText = "❌ Rejected";
+                          } else if (approved) {
+                            dotColor = "#16a34a";
+                            badgeBg = "#dcfce7";
+                            badgeColor = "#16a34a";
+                            badgeText = "✅ Approved";
+                          } else if (gateClosedByOther) {
+                            dotColor = "#e5e7eb";
+                            badgeBg = "#f3f4f6";
+                            badgeColor = "#9ca3af";
+                            badgeText = "— N/A";
+                          }
+
+                          return (
+                            <div
+                              key={idx}
                               style={{
-                                width: 10,
-                                height: 10,
-                                borderRadius: "50%",
-                                backgroundColor: dotColor,
-                                flexShrink: 0,
-                              }}
-                            />
-                            <span
-                              style={{
-                                fontSize: "0.875rem",
-                                color: "#374151",
-                                flex: 1,
-                              }}
-                            >
-                              {step.label}
-                            </span>
-                            <span
-                              style={{
-                                fontSize: "0.75rem",
-                                color: statusColor,
-                                fontWeight: 500,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 12,
+                                padding: "10px 14px",
+                                border: "1px solid #e5e7eb",
+                                borderRadius: 8,
+                                backgroundColor: "#fafafa",
                               }}
                             >
-                              {statusIcon} {statusLabel}
-                            </span>
-                          </div>
-                        );
-                      })}
+                              <span
+                                style={{
+                                  width: 10,
+                                  height: 10,
+                                  borderRadius: "50%",
+                                  backgroundColor: dotColor,
+                                  flexShrink: 0,
+                                  display: "inline-block",
+                                }}
+                              />
+                              <span
+                                style={{
+                                  flex: 1,
+                                  fontSize: "0.82rem",
+                                  color: "#374151",
+                                }}
+                              >
+                                {label}
+                                {shared && (
+                                  <span
+                                    style={{
+                                      fontSize: "0.7rem",
+                                      color: "#9ca3af",
+                                      marginLeft: 6,
+                                    }}
+                                  >
+                                    (shared gate)
+                                  </span>
+                                )}
+                                {approved && approverName && (
+                                  <span
+                                    style={{
+                                      fontSize: "0.75rem",
+                                      color: "#16a34a",
+                                      fontWeight: 600,
+                                      marginLeft: 6,
+                                    }}
+                                  >
+                                    — {approverName}
+                                  </span>
+                                )}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: "0.75rem",
+                                  fontWeight: 600,
+                                  padding: "3px 12px",
+                                  borderRadius: 999,
+                                  backgroundColor: badgeBg,
+                                  color: badgeColor,
+                                }}
+                              >
+                                {badgeText}
+                              </span>
+                            </div>
+                          );
+                        },
+                      )}
                     </div>
                   </div>
 
@@ -1115,6 +1780,247 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
 
 // ── Sub-components ─────────────────────────────────────────────────────
 
+function PriorityTable({
+  records,
+  onView,
+  onDone,
+  onIssue,
+  onTogglePriority,
+  priorityIds,
+}: {
+  records: SubmissionRecord[];
+  onView: (record: SubmissionRecord) => void;
+  onDone: (record: SubmissionRecord) => void;
+  onIssue: (record: SubmissionRecord) => void;
+  onTogglePriority: (id: number) => void;
+  priorityIds: Set<number>;
+}) {
+  return (
+    <table
+      style={{
+        width: "100%",
+        borderCollapse: "collapse",
+        fontSize: "0.875rem",
+      }}
+    >
+      <thead>
+        <tr
+          style={{
+            backgroundColor: "#fff7ed",
+            borderBottom: "1px solid #fde68a",
+          }}
+        >
+          {[
+            "APPLICANT",
+            "DATE",
+            "OFFICE CODE",
+            "ACCOUNT TYPE",
+            "MODULES",
+            "ACTIONS",
+          ].map((h) => (
+            <th
+              key={h}
+              style={{
+                textAlign: "left",
+                padding: "10px 20px",
+                fontSize: "0.7rem",
+                fontWeight: 600,
+                color: "#92400e",
+                letterSpacing: "0.05em",
+              }}
+            >
+              {h}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {records.map((req, i) => {
+          const userInfo = req.uaa_user_info[0];
+          const sysAccess = req.uaa_system_access[0];
+          const modules = req.uaa_modules[0];
+          const moduleList = modules?.selected_modules ?? [];
+          const fullName = userInfo
+            ? `${userInfo.last_name}, ${userInfo.first_name} ${userInfo.middle_name ?? ""}`.trim()
+            : "—";
+
+          return (
+            <tr
+              key={req.id}
+              style={{
+                borderBottom: "1px solid #fef3c7",
+                backgroundColor: i % 2 === 0 ? "#fff" : "#fffbeb",
+              }}
+            >
+              <td style={{ padding: "14px 20px" }}>
+                <div style={{ fontWeight: 600, color: "#111827" }}>
+                  {fullName}
+                </div>
+                <div
+                  style={{
+                    fontSize: "0.75rem",
+                    color: "#9ca3af",
+                    marginTop: 2,
+                  }}
+                >
+                  {userInfo?.designation ?? "—"} •{" "}
+                  {userInfo?.employee_id ?? "—"}
+                </div>
+              </td>
+              <td style={{ padding: "14px 20px", color: "#4b5563" }}>
+                {req.submitted_at
+                  ? new Date(req.submitted_at).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })
+                  : "—"}
+              </td>
+              <td style={{ padding: "14px 20px", color: "#4b5563" }}>
+                {req.office_code ?? "—"}
+              </td>
+              <td style={{ padding: "14px 20px", color: "#4b5563" }}>
+                {sysAccess?.account_type ?? "—"}
+              </td>
+              <td style={{ padding: "14px 20px" }}>
+                {moduleList.length > 0 ? (
+                  <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>
+                    {moduleList.slice(0, 2).join(", ")}
+                    {moduleList.length > 2 && (
+                      <span style={{ color: "#3b82f6" }}>
+                        {" "}
+                        +{moduleList.length - 2} more
+                      </span>
+                    )}
+                  </span>
+                ) : (
+                  <span style={{ fontSize: "0.75rem", color: "#9ca3af" }}>
+                    —
+                  </span>
+                )}
+              </td>
+              <td style={{ padding: "14px 20px" }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <ActionBtn
+                    onClick={() => onView(req)}
+                    color="#6b7280"
+                    borderColor="#d1d5db"
+                    label="View"
+                  />
+                  <ActionBtn
+                    onClick={() => onDone(req)}
+                    color="#16a34a"
+                    borderColor="#4ade80"
+                    label="Mark Done"
+                  />
+                  <ActionBtn
+                    onClick={() => onIssue(req)}
+                    color="#ef4444"
+                    borderColor="#f87171"
+                    label="Flag Issue"
+                  />
+                  <ActionBtn
+                    onClick={() => onTogglePriority(req.id)}
+                    color={priorityIds.has(req.id) ? "#d97706" : "#6b7280"}
+                    borderColor={
+                      priorityIds.has(req.id) ? "#f59e0b" : "#d1d5db"
+                    }
+                    label={
+                      priorityIds.has(req.id) ? "★ Unpriority" : "☆ Priority"
+                    }
+                  />
+                </div>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+function SearchBox({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <input
+      type="search"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder="Search name or office"
+      style={{
+        width: 220,
+        padding: "8px 12px",
+        border: "1px solid #d1d5db",
+        borderRadius: 8,
+        fontSize: "0.8rem",
+        color: "#111827",
+        outline: "none",
+      }}
+    />
+  );
+}
+
+function Pagination({
+  page,
+  pageCount,
+  total,
+  onPageChange,
+}: {
+  page: number;
+  pageCount: number;
+  total: number;
+  onPageChange: (page: number) => void;
+}) {
+  return (
+    <div
+      style={{
+        padding: "12px 20px",
+        borderTop: "1px solid #f3f4f6",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+      }}
+    >
+      <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>
+        Page {page} of {pageCount} • {total} request{total === 1 ? "" : "s"}
+      </span>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          onClick={() => onPageChange(Math.max(1, page - 1))}
+          disabled={page <= 1}
+          style={pagerButtonStyle(page <= 1)}
+        >
+          Previous
+        </button>
+        <button
+          onClick={() => onPageChange(Math.min(pageCount, page + 1))}
+          disabled={page >= pageCount}
+          style={pagerButtonStyle(page >= pageCount)}
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function pagerButtonStyle(disabled: boolean): CSSProperties {
+  return {
+    border: "1px solid #d1d5db",
+    background: disabled ? "#f3f4f6" : "#fff",
+    color: disabled ? "#9ca3af" : "#374151",
+    borderRadius: 8,
+    padding: "6px 12px",
+    cursor: disabled ? "not-allowed" : "pointer",
+    fontSize: "0.75rem",
+  };
+}
+
 function SectionHeader({ label }: { label: string }) {
   return (
     <div
@@ -1167,41 +2073,6 @@ function FieldBlock({ label, value }: { label: string; value: string }) {
       <div style={{ fontSize: "0.9rem", color: "#111827", fontWeight: 500 }}>
         {value}
       </div>
-    </div>
-  );
-}
-
-function ApprovalRow({
-  label,
-  approved,
-  isRejected,
-}: {
-  label: string;
-  approved: boolean | null | undefined;
-  isRejected: boolean;
-}) {
-  const color = isRejected ? "#ef4444" : approved ? "#16a34a" : "#9ca3af";
-  const bg = isRejected ? "#fee2e2" : approved ? "#dcfce7" : "#f3f4f6";
-  const lbl = isRejected ? "Rejected" : approved ? "Approved" : "Pending";
-  return (
-    <div
-      style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}
-    >
-      <span style={{ fontSize: "0.75rem", color: "#9ca3af", width: 140 }}>
-        {label}:
-      </span>
-      <span
-        style={{
-          fontSize: "0.75rem",
-          fontWeight: 500,
-          padding: "2px 10px",
-          borderRadius: 999,
-          backgroundColor: bg,
-          color,
-        }}
-      >
-        {lbl}
-      </span>
     </div>
   );
 }
@@ -1291,24 +2162,5 @@ function ActionBtn({
     >
       {label}
     </button>
-  );
-}
-
-function ModalRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
-      <span
-        style={{
-          fontSize: "0.75rem",
-          color: "#9ca3af",
-          width: 120,
-          flexShrink: 0,
-          paddingTop: 2,
-        }}
-      >
-        {label}
-      </span>
-      <span style={{ fontSize: "0.875rem", color: "#111827" }}>{value}</span>
-    </div>
   );
 }

@@ -21,6 +21,16 @@ export const ADMIN_CREDENTIALS: AdminCredential[] = [
   },
 ];
 
+export const PREDEFINED_LEVEL4_ACCOUNT: AdminCredential = {
+  id: 0,
+  username: "level4",
+  password: "level4admin",
+  level: 4,
+  displayName: "Level 4 Implementor",
+  role: "Implementor / IT Officer",
+  office: "Implementor / IT Officer",
+};
+
 export type ApprovalStatus = "pending" | "approved" | "rejected" | null;
 
 export interface ApprovalRequest {

@@ -32,9 +32,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (![1, 2, 3, 4].includes(Number(level))) {
+    if (![1, 2, 3].includes(Number(level))) {
       return NextResponse.json(
-        { error: "Invalid access level selected." },
+        { error: "Only Level 1 to Level 3 accounts can be registered here." },
         { status: 400 },
       );
     }

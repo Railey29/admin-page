@@ -3,10 +3,9 @@ import { useState } from "react";
 
 interface LoginPageProps {
   onLogin: (username: string, password: string) => boolean | Promise<boolean>;
-  onRegister?: () => void;
 }
 
-export default function LoginPage({ onLogin, onRegister }: LoginPageProps) {
+export default function LoginPage({ onLogin }: LoginPageProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -225,7 +224,6 @@ export default function LoginPage({ onLogin, onRegister }: LoginPageProps) {
           </button>
         </form>
 
-        {/* Register link */}
         <p
           style={{
             textAlign: "center",
@@ -234,23 +232,7 @@ export default function LoginPage({ onLogin, onRegister }: LoginPageProps) {
             marginTop: "20px",
           }}
         >
-          Don&apos;t have an account?{" "}
-          <button
-            onClick={onRegister}
-            style={{
-              background: "none",
-              border: "none",
-              color: "#1e3a8a",
-              fontWeight: 600,
-              fontSize: "0.75rem",
-              cursor: "pointer",
-              padding: 0,
-              textDecoration: "underline",
-              textUnderlineOffset: "2px",
-            }}
-          >
-            Register
-          </button>
+          Accounts are created by the Level 4 administrator.
         </p>
       </div>
     </div>

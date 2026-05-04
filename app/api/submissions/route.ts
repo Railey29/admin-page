@@ -9,7 +9,7 @@ export async function GET() {
         uaa_system_access: true,
         uaa_modules: true,
       },
-      orderBy: { submitted_at: "desc" },
+      orderBy: { submitted_at: "asc" },
     });
     return NextResponse.json({ success: true, data: submissions });
   } catch (error: unknown) {

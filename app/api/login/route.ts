@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../controllers/dbClient";
 import bcrypt from "bcryptjs";
+import { PREDEFINED_LEVEL4_ACCOUNT } from "../../models/authModel";
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,6 +13,21 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
+
+    if (
+      username === PREDEFINED_LEVEL4_ACCOUNT.username &&
+      password === PREDEFINED_LEVEL4_ACCOUNT.password
+    ) {
+      return NextResponse.json({
+        id: PREDEFINED_LEVEL4_ACCOUNT.id,
+        username: PREDEFINED_LEVEL4_ACCOUNT.username,
+        level: PREDEFINED_LEVEL4_ACCOUNT.level,
+        displayName: PREDEFINED_LEVEL4_ACCOUNT.displayName,
+        role: PREDEFINED_LEVEL4_ACCOUNT.role,
+        office: PREDEFINED_LEVEL4_ACCOUNT.office,
+      });
+    }
+
     const account = await prisma.admin_accounts.findUnique({
       where: { username },
     });

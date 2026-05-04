@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import type { CSSProperties } from "react";
+import { useEffect, useState } from "react";
 import { AdminCredential } from "../../models/authModel";
 import { useSubmissions, SubmissionRecord } from "../../hooks/useSubmissions";
 import { EmailPayload } from "../../models/emailModel";
@@ -11,6 +12,69 @@ interface Props {
 }
 
 type Tab = "dashboard" | "reports";
+type DateFilter = "today" | "thisWeek" | "thisMonth" | "thisYear" | "allTime";
+const PAGE_SIZE = 4;
+
+const dateFilterLabels: Record<DateFilter, string> = {
+  today: "Today",
+  thisWeek: "This Week",
+  thisMonth: "This Month",
+  thisYear: "This Year",
+  allTime: "All Time",
+};
+
+const dateFilters: DateFilter[] = [
+  "today",
+  "thisWeek",
+  "thisMonth",
+  "thisYear",
+  "allTime",
+];
+
+function startOfDay(date: Date) {
+  const copy = new Date(date);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
+}
+
+function isWithinDateFilter(submittedAt: string | null, filter: DateFilter) {
+  if (filter === "allTime") return true;
+  if (!submittedAt) return false;
+
+  const submittedDate = new Date(submittedAt);
+  const now = new Date();
+
+  if (filter === "today") {
+    return startOfDay(submittedDate).getTime() === startOfDay(now).getTime();
+  }
+
+  if (filter === "thisWeek") {
+    const startOfWeek = startOfDay(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    return submittedDate >= startOfWeek;
+  }
+
+  if (filter === "thisMonth") {
+    return (
+      submittedDate.getMonth() === now.getMonth() &&
+      submittedDate.getFullYear() === now.getFullYear()
+    );
+  }
+
+  return submittedDate.getFullYear() === now.getFullYear();
+}
+
+function sortByFifoDate(records: SubmissionRecord[]) {
+  return [...records].sort((a, b) => {
+    const aTime = a.submitted_at
+      ? new Date(a.submitted_at).getTime()
+      : Infinity;
+    const bTime = b.submitted_at
+      ? new Date(b.submitted_at).getTime()
+      : Infinity;
+    return aTime - bTime;
+  });
+}
 
 // ── Same pattern as Level4Dashboard ──────────────────────────────────
 async function sendStatusEmail(payload: EmailPayload) {
@@ -27,19 +91,44 @@ async function sendStatusEmail(payload: EmailPayload) {
 
 export default function Level1to3Dashboard({ admin, onLogout }: Props) {
   const [tab, setTab] = useState<Tab>("dashboard");
-  const [filter, setFilter] = useState<
-    "thisWeek" | "thisMonth" | "thisYear" | "allTime"
-  >("thisWeek");
+  const [filter, setFilter] = useState<DateFilter>("thisWeek");
   const [viewModal, setViewModal] = useState<SubmissionRecord | null>(null);
 
   // ── Reject comment modal state (same as Level4) ───────────────────
   const [rejectModal, setRejectModal] = useState<SubmissionRecord | null>(null);
   const [rejectComment, setRejectComment] = useState("");
+  const [approveModal, setApproveModal] = useState<SubmissionRecord | null>(
+    null,
+  );
+  const [approveComment, setApproveComment] = useState("");
   const [sending, setSending] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [pendingPage, setPendingPage] = useState(1);
+  const [priorityPage, setPriorityPage] = useState(1);
+  const [reportPage, setReportPage] = useState(1);
+  const [reportPriorityPage, setReportPriorityPage] = useState(1);
+  const [priorityIds, setPriorityIds] = useState<Set<number>>(new Set());
 
   const { submissions, stats, loading, approve, reject } = useSubmissions(
     admin.level,
   );
+  const priorityStorageKey = `lto_priority_level_${admin.level}`;
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(priorityStorageKey);
+      if (stored) setPriorityIds(new Set(JSON.parse(stored)));
+    } catch {
+      localStorage.removeItem(priorityStorageKey);
+    }
+  }, [priorityStorageKey]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      priorityStorageKey,
+      JSON.stringify(Array.from(priorityIds)),
+    );
+  }, [priorityIds, priorityStorageKey]);
 
   const pendingForMe = submissions.filter((s) => {
     if (s.status === "Rejected") return false;
@@ -55,9 +144,123 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
     return false;
   });
 
-  const handleApprove = async (id: number) => {
-    await approve(id);
+  const getApplicantName = (record: SubmissionRecord) => {
+    const userInfo = record.uaa_user_info[0];
+    return userInfo
+      ? `${userInfo.last_name ?? ""}, ${userInfo.first_name ?? ""} ${userInfo.middle_name ?? ""}`.trim()
+      : "";
+  };
+
+  const matchesSearch = (record: SubmissionRecord) => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return true;
+    return (
+      getApplicantName(record).toLowerCase().includes(query) ||
+      (record.office_code ?? "").toLowerCase().includes(query)
+    );
+  };
+
+  const filteredPending = sortByFifoDate(
+    pendingForMe.filter((record) =>
+      isWithinDateFilter(record.submitted_at, filter),
+    ),
+  );
+  const allSearchedPending = filteredPending.filter(matchesSearch);
+  const priorityPending = allSearchedPending.filter((record) =>
+    priorityIds.has(record.id),
+  );
+  const searchedPending = allSearchedPending.filter(
+    (record) => !priorityIds.has(record.id),
+  );
+  const priorityPageCount = Math.max(
+    1,
+    Math.ceil(priorityPending.length / PAGE_SIZE),
+  );
+  const pagedPriority = priorityPending.slice(
+    (priorityPage - 1) * PAGE_SIZE,
+    priorityPage * PAGE_SIZE,
+  );
+  const pendingPageCount = Math.max(
+    1,
+    Math.ceil(searchedPending.length / PAGE_SIZE),
+  );
+  const pagedPending = searchedPending.slice(
+    (pendingPage - 1) * PAGE_SIZE,
+    pendingPage * PAGE_SIZE,
+  );
+  const filteredReports = sortByFifoDate(
+    submissions.filter((record) =>
+      isWithinDateFilter(record.submitted_at, filter),
+    ),
+  );
+  const searchedReports = filteredReports.filter(matchesSearch);
+  const reportPriorityList = searchedReports.filter((record) =>
+    priorityIds.has(record.id),
+  );
+  const reportNonPriorityList = searchedReports.filter(
+    (record) => !priorityIds.has(record.id),
+  );
+  const reportPriorityCount = reportPriorityList.length;
+  const reportPriorityPageCount = Math.max(
+    1,
+    Math.ceil(reportPriorityList.length / PAGE_SIZE),
+  );
+  const pagedReportPriority = reportPriorityList.slice(
+    (reportPriorityPage - 1) * PAGE_SIZE,
+    reportPriorityPage * PAGE_SIZE,
+  );
+  const reportPageCount = Math.max(
+    1,
+    Math.ceil(reportNonPriorityList.length / PAGE_SIZE),
+  );
+  const pagedReports = reportNonPriorityList.slice(
+    (reportPage - 1) * PAGE_SIZE,
+    reportPage * PAGE_SIZE,
+  );
+
+  const openApproveModal = (record: SubmissionRecord) => {
+    setApproveComment("");
+    setApproveModal(record);
     setViewModal(null);
+  };
+
+  const togglePriority = (id: number) => {
+    setPriorityIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+    setPendingPage(1);
+    setPriorityPage(1);
+    setReportPage(1);
+    setReportPriorityPage(1);
+  };
+
+  const handleConfirmApprove = async () => {
+    if (!approveModal) return;
+    const userInfo = approveModal.uaa_user_info[0];
+    const fullName = userInfo
+      ? `${userInfo.last_name}, ${userInfo.first_name} ${userInfo.middle_name ?? ""}`.trim()
+      : "Applicant";
+
+    setSending(true);
+    try {
+      await approve(approveModal.id);
+      await sendStatusEmail({
+        to: userInfo?.email ?? "",
+        applicantName: fullName,
+        trackingId: approveModal.tracking_id,
+        status: "Processed",
+        comment: approveComment.trim() || undefined,
+      });
+    } finally {
+      setSending(false);
+      setApproveModal(null);
+    }
   };
 
   // ── Opens the reject comment modal (same flow as Level4) ──────────
@@ -91,32 +294,6 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
       setRejectModal(null);
     }
   };
-
-  const filterLabels: Record<string, string> = {
-    thisWeek: "This Week",
-    thisMonth: "This Month",
-    thisYear: "This Year",
-    allTime: "All Time",
-  };
-
-  const now = new Date();
-  const filteredSubmissions = submissions.filter((s) => {
-    if (!s.submitted_at || filter === "allTime") return true;
-    const d = new Date(s.submitted_at);
-    if (filter === "thisWeek") {
-      const startOfWeek = new Date(now);
-      startOfWeek.setDate(now.getDate() - now.getDay());
-      startOfWeek.setHours(0, 0, 0, 0);
-      return d >= startOfWeek;
-    }
-    if (filter === "thisMonth") {
-      return (
-        d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
-      );
-    }
-    if (filter === "thisYear") return d.getFullYear() === now.getFullYear();
-    return true;
-  });
 
   const canActOnRecord = (record: SubmissionRecord): boolean => {
     if (record.status === "Rejected") return false;
@@ -251,7 +428,11 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
         {(["dashboard", "reports"] as Tab[]).map((t) => (
           <button
             key={t}
-            onClick={() => setTab(t)}
+            onClick={() => {
+              setTab(t);
+              setPendingPage(1);
+              setReportPage(1);
+            }}
             style={{
               padding: "12px 4px",
               fontSize: "0.875rem",
@@ -301,13 +482,16 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                   flexWrap: "wrap",
                 }}
               >
-                <div style={{ display: "flex", gap: 6 }}>
-                  {(
-                    ["thisWeek", "thisMonth", "thisYear", "allTime"] as const
-                  ).map((f) => (
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {dateFilters.map((f) => (
                     <button
                       key={f}
-                      onClick={() => setFilter(f)}
+                      onClick={() => {
+                        setFilter(f);
+                        setPendingPage(1);
+                        setPriorityPage(1);
+                        setReportPage(1);
+                      }}
                       style={{
                         fontSize: "0.75rem",
                         padding: "6px 12px",
@@ -320,14 +504,14 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                         borderColor: filter === f ? "#1e3a8a" : "#d1d5db",
                       }}
                     >
-                      {filterLabels[f]}
+                      {dateFilterLabels[f]}
                     </button>
                   ))}
                 </div>
                 <ExportButtons
-                  records={filteredSubmissions}
+                  records={[...priorityPending, ...searchedPending]}
                   filename={`submissions-level${admin.level}-${filter}`}
-                  pdfTitle={`UAA Submissions — Level ${admin.level} (${filterLabels[filter]})`}
+                  pdfTitle={`UAA Submissions — Level ${admin.level} (${dateFilterLabels[filter]})`}
                 />
               </div>
             </div>
@@ -374,6 +558,63 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
               style={{
                 backgroundColor: "#fff",
                 borderRadius: 12,
+                border: "1px solid #fde68a",
+                overflow: "hidden",
+                marginBottom: 16,
+              }}
+            >
+              <div
+                style={{
+                  padding: "14px 20px",
+                  borderBottom: "1px solid #fef3c7",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  backgroundColor: "#fffbeb",
+                }}
+              >
+                <span style={{ fontWeight: 700, color: "#92400e" }}>
+                  ⭐ Priority Requests
+                </span>
+                <span style={{ fontSize: "0.75rem", color: "#b45309" }}>
+                  {priorityPending.length} prioritized
+                </span>
+              </div>
+              {priorityPending.length === 0 ? (
+                <div
+                  style={{
+                    padding: "24px 20px",
+                    textAlign: "center",
+                    color: "#b45309",
+                    fontSize: "0.875rem",
+                  }}
+                >
+                  Click the star beside Approve/Reject to move a request here.
+                </div>
+              ) : (
+                <>
+                  <PriorityTable
+                    records={pagedPriority}
+                    onView={setViewModal}
+                    onApprove={openApproveModal}
+                    onReject={openRejectModal}
+                    onTogglePriority={togglePriority}
+                    priorityIds={priorityIds}
+                  />
+                  <Pagination
+                    page={priorityPage}
+                    pageCount={priorityPageCount}
+                    total={priorityPending.length}
+                    onPageChange={setPriorityPage}
+                  />
+                </>
+              )}
+            </div>
+
+            <div
+              style={{
+                backgroundColor: "#fff",
+                borderRadius: 12,
                 border: "1px solid #e5e7eb",
                 overflow: "hidden",
               }}
@@ -384,27 +625,39 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                   borderBottom: "1px solid #f3f4f6",
                   display: "flex",
                   alignItems: "center",
+                  justifyContent: "space-between",
                   gap: 10,
                 }}
               >
-                <span style={{ fontWeight: 600, color: "#111827" }}>
-                  ⏳ Pending — Awaiting Your Approval
-                </span>
-                {(admin.level === 2 || admin.level === 3) && (
-                  <span
-                    style={{
-                      fontSize: "0.7rem",
-                      backgroundColor: "#eff6ff",
-                      color: "#1d4ed8",
-                      border: "1px solid #bfdbfe",
-                      padding: "2px 10px",
-                      borderRadius: 999,
-                      fontWeight: 500,
-                    }}
-                  >
-                    Shared gate — Level 2 &amp; 3 (first to act wins)
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontWeight: 600, color: "#111827" }}>
+                    ⏳ Pending — Awaiting Your Approval
                   </span>
-                )}
+                  {(admin.level === 2 || admin.level === 3) && (
+                    <span
+                      style={{
+                        fontSize: "0.7rem",
+                        backgroundColor: "#eff6ff",
+                        color: "#1d4ed8",
+                        border: "1px solid #bfdbfe",
+                        padding: "2px 10px",
+                        borderRadius: 999,
+                        fontWeight: 500,
+                      }}
+                    >
+                      Shared gate — Level 2 &amp; 3 (first to act wins)
+                    </span>
+                  )}
+                </div>
+                <SearchBox
+                  value={searchTerm}
+                  onChange={(value) => {
+                    setSearchTerm(value);
+                    setPendingPage(1);
+                    setPriorityPage(1);
+                    setReportPage(1);
+                  }}
+                />
               </div>
               {loading ? (
                 <div
@@ -417,7 +670,7 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                 >
                   Loading submissions...
                 </div>
-              ) : pendingForMe.length === 0 ? (
+              ) : searchedPending.length === 0 ? (
                 <div
                   style={{
                     padding: "40px 20px",
@@ -426,7 +679,7 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                     fontSize: "0.875rem",
                   }}
                 >
-                  No pending requests for your approval level.
+                  No pending requests match your search.
                 </div>
               ) : (
                 <table
@@ -467,7 +720,7 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                     </tr>
                   </thead>
                   <tbody>
-                    {pendingForMe.map((req, i) => {
+                    {pagedPending.map((req, i) => {
                       const userInfo = req.uaa_user_info[0];
                       const sysAccess = req.uaa_system_access[0];
                       const fullName = userInfo
@@ -529,7 +782,7 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                                 label="👁 View"
                               />
                               <ActionBtn
-                                onClick={() => handleApprove(req.id)}
+                                onClick={() => openApproveModal(req)}
                                 color="#16a34a"
                                 borderColor="#4ade80"
                                 label="✅ Approve"
@@ -541,6 +794,16 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                                 borderColor="#f87171"
                                 label="❌ Reject"
                               />
+                              <ActionBtn
+                                onClick={() => togglePriority(req.id)}
+                                color="#d97706"
+                                borderColor="#f59e0b"
+                                label={
+                                  priorityIds.has(req.id)
+                                    ? "★ Unpriority"
+                                    : "☆ Priority"
+                                }
+                              />
                             </div>
                           </td>
                         </tr>
@@ -548,6 +811,14 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                     })}
                   </tbody>
                 </table>
+              )}
+              {!loading && searchedPending.length > 0 && (
+                <Pagination
+                  page={pendingPage}
+                  pageCount={pendingPageCount}
+                  total={searchedPending.length}
+                  onPageChange={setPendingPage}
+                />
               )}
             </div>
 
@@ -614,179 +885,300 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
         )}
 
         {tab === "reports" && (
-          <div
-            style={{
-              backgroundColor: "#fff",
-              borderRadius: 12,
-              border: "1px solid #e5e7eb",
-              overflow: "hidden",
-            }}
-          >
+          <>
+            {reportPriorityCount > 0 && (
+              <div
+                style={{
+                  backgroundColor: "#fff",
+                  borderRadius: 12,
+                  border: "1px solid #fde68a",
+                  overflow: "hidden",
+                  marginBottom: 16,
+                }}
+              >
+                <div
+                  style={{
+                    padding: "14px 20px",
+                    borderBottom: "1px solid #fef3c7",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    backgroundColor: "#fffbeb",
+                  }}
+                >
+                  <span style={{ fontWeight: 700, color: "#92400e" }}>
+                    ⭐ Priority Requests
+                  </span>
+                  <span style={{ fontSize: "0.75rem", color: "#b45309" }}>
+                    {reportPriorityCount} prioritized
+                  </span>
+                </div>
+                <div style={{ padding: "16px 20px" }}>
+                  <PriorityTable
+                    records={pagedReportPriority}
+                    onView={setViewModal}
+                    onApprove={openApproveModal}
+                    onReject={openRejectModal}
+                    onTogglePriority={togglePriority}
+                    priorityIds={priorityIds}
+                  />
+                  <Pagination
+                    page={reportPriorityPage}
+                    pageCount={reportPriorityPageCount}
+                    total={reportPriorityCount}
+                    onPageChange={setReportPriorityPage}
+                  />
+                </div>
+              </div>
+            )}
             <div
               style={{
-                padding: "16px 20px",
-                borderBottom: "1px solid #f3f4f6",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
+                backgroundColor: "#fff",
+                borderRadius: 12,
+                border: "1px solid #e5e7eb",
+                overflow: "hidden",
               }}
             >
-              <span style={{ fontWeight: 600, color: "#111827" }}>
-                📊 All Submissions Report
-              </span>
-              <ExportButtons
-                records={submissions}
-                filename={`all-submissions-level${admin.level}`}
-                pdfTitle={`All UAA Submissions — Level ${admin.level}`}
-              />
-            </div>
-            {loading ? (
               <div
                 style={{
-                  padding: "40px 20px",
-                  textAlign: "center",
-                  color: "#9ca3af",
-                  fontSize: "0.875rem",
+                  padding: "16px 20px",
+                  borderBottom: "1px solid #f3f4f6",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 12,
                 }}
               >
-                Loading...
-              </div>
-            ) : submissions.length === 0 ? (
-              <div
-                style={{
-                  padding: "40px 20px",
-                  textAlign: "center",
-                  color: "#9ca3af",
-                  fontSize: "0.875rem",
-                }}
-              >
-                No submissions found.
-              </div>
-            ) : (
-              <table
-                style={{
-                  width: "100%",
-                  borderCollapse: "collapse",
-                  fontSize: "0.875rem",
-                }}
-              >
-                <thead>
-                  <tr
-                    style={{
-                      backgroundColor: "#f9fafb",
-                      borderBottom: "1px solid #f3f4f6",
-                    }}
-                  >
-                    {[
-                      "TRACKING ID",
-                      "APPLICANT",
-                      "OFFICE CODE",
-                      "ACCOUNT TYPE",
-                      "DATE SUBMITTED",
-                      "STATUS",
-                    ].map((h) => (
-                      <th
-                        key={h}
+                <span style={{ fontWeight: 600, color: "#111827" }}>
+                  📊 All Submissions Report
+                </span>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 10,
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {dateFilters.map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => {
+                          setFilter(f);
+                          setPendingPage(1);
+                          setReportPage(1);
+                        }}
                         style={{
-                          textAlign: "left",
-                          padding: "10px 20px",
-                          fontSize: "0.7rem",
-                          fontWeight: 600,
-                          color: "#6b7280",
-                          letterSpacing: "0.05em",
+                          fontSize: "0.75rem",
+                          padding: "6px 12px",
+                          borderRadius: 6,
+                          cursor: "pointer",
+                          border: "1px solid",
+                          transition: "all 0.15s",
+                          backgroundColor: filter === f ? "#1e3a8a" : "#fff",
+                          color: filter === f ? "#fff" : "#6b7280",
+                          borderColor: filter === f ? "#1e3a8a" : "#d1d5db",
                         }}
                       >
-                        {h}
-                      </th>
+                        {dateFilterLabels[f]}
+                      </button>
                     ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {submissions.map((req, i) => {
-                    const userInfo = req.uaa_user_info[0];
-                    const sysAccess = req.uaa_system_access[0];
-                    const fullName = userInfo
-                      ? `${userInfo.last_name}, ${userInfo.first_name}`.trim()
-                      : "—";
-                    const isRejected = req.status === "Rejected";
-                    const isProcessed = req.approved_by_l4;
-                    return (
-                      <tr
-                        key={req.id}
-                        style={{
-                          borderBottom: "1px solid #f9fafb",
-                          backgroundColor: i % 2 === 0 ? "#fff" : "#fafafa",
-                        }}
-                      >
-                        <td
+                  </div>
+                  <SearchBox
+                    value={searchTerm}
+                    onChange={(value) => {
+                      setSearchTerm(value);
+                      setPendingPage(1);
+                      setReportPage(1);
+                    }}
+                  />
+                  <ExportButtons
+                    records={searchedReports}
+                    filename={`all-submissions-level${admin.level}-${filter}`}
+                    pdfTitle={`All UAA Submissions — Level ${admin.level} (${dateFilterLabels[filter]})`}
+                  />
+                </div>
+              </div>
+              {loading ? (
+                <div
+                  style={{
+                    padding: "40px 20px",
+                    textAlign: "center",
+                    color: "#9ca3af",
+                    fontSize: "0.875rem",
+                  }}
+                >
+                  Loading...
+                </div>
+              ) : reportNonPriorityList.length === 0 ? (
+                <div
+                  style={{
+                    padding: "40px 20px",
+                    textAlign: "center",
+                    color: "#9ca3af",
+                    fontSize: "0.875rem",
+                  }}
+                >
+                  No submissions match your search.
+                </div>
+              ) : (
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    fontSize: "0.875rem",
+                  }}
+                >
+                  <thead>
+                    <tr
+                      style={{
+                        backgroundColor: "#f9fafb",
+                        borderBottom: "1px solid #f3f4f6",
+                      }}
+                    >
+                      {[
+                        "TRACKING ID",
+                        "APPLICANT",
+                        "OFFICE CODE",
+                        "ACCOUNT TYPE",
+                        "DATE SUBMITTED",
+                        "STATUS",
+                        "ACTIONS",
+                      ].map((h) => (
+                        <th
+                          key={h}
                           style={{
-                            padding: "12px 20px",
-                            color: "#6b7280",
-                            fontSize: "0.8rem",
-                          }}
-                        >
-                          {req.tracking_id}
-                        </td>
-                        <td
-                          style={{
-                            padding: "12px 20px",
+                            textAlign: "left",
+                            padding: "10px 20px",
+                            fontSize: "0.7rem",
                             fontWeight: 600,
-                            color: "#111827",
+                            color: "#6b7280",
+                            letterSpacing: "0.05em",
                           }}
                         >
-                          {fullName}
-                        </td>
-                        <td style={{ padding: "12px 20px", color: "#4b5563" }}>
-                          {req.office_code ?? "—"}
-                        </td>
-                        <td style={{ padding: "12px 20px", color: "#4b5563" }}>
-                          {sysAccess?.account_type ?? "—"}
-                        </td>
-                        <td style={{ padding: "12px 20px", color: "#4b5563" }}>
-                          {req.submitted_at
-                            ? new Date(req.submitted_at).toLocaleDateString(
-                                "en-US",
-                                {
-                                  month: "short",
-                                  day: "numeric",
-                                  year: "numeric",
-                                },
-                              )
-                            : "—"}
-                        </td>
-                        <td style={{ padding: "12px 20px" }}>
-                          <span
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pagedReports.map((req, i) => {
+                      const userInfo = req.uaa_user_info[0];
+                      const sysAccess = req.uaa_system_access[0];
+                      const fullName = userInfo
+                        ? `${userInfo.last_name}, ${userInfo.first_name}`.trim()
+                        : "—";
+                      const isRejected = req.status === "Rejected";
+                      const isProcessed = req.approved_by_l4;
+                      return (
+                        <tr
+                          key={req.id}
+                          style={{
+                            borderBottom: "1px solid #f9fafb",
+                            backgroundColor: i % 2 === 0 ? "#fff" : "#fafafa",
+                          }}
+                        >
+                          <td
                             style={{
-                              fontSize: "0.75rem",
-                              fontWeight: 500,
-                              padding: "3px 10px",
-                              borderRadius: 999,
-                              backgroundColor: isRejected
-                                ? "#fef2f2"
-                                : isProcessed
-                                  ? "#f0fdf4"
-                                  : "#fff7ed",
-                              color: isRejected
-                                ? "#ef4444"
-                                : isProcessed
-                                  ? "#16a34a"
-                                  : "#f97316",
+                              padding: "12px 20px",
+                              color: "#6b7280",
+                              fontSize: "0.8rem",
                             }}
                           >
-                            {isRejected
-                              ? "❌ Rejected"
-                              : isProcessed
-                                ? "✅ Processed"
-                                : "⏳ Pending"}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-          </div>
+                            {req.tracking_id}
+                          </td>
+                          <td
+                            style={{
+                              padding: "12px 20px",
+                              fontWeight: 600,
+                              color: "#111827",
+                            }}
+                          >
+                            {fullName}
+                          </td>
+                          <td
+                            style={{ padding: "12px 20px", color: "#4b5563" }}
+                          >
+                            {req.office_code ?? "—"}
+                          </td>
+                          <td
+                            style={{ padding: "12px 20px", color: "#4b5563" }}
+                          >
+                            {sysAccess?.account_type ?? "—"}
+                          </td>
+                          <td
+                            style={{ padding: "12px 20px", color: "#4b5563" }}
+                          >
+                            {req.submitted_at
+                              ? new Date(req.submitted_at).toLocaleDateString(
+                                  "en-US",
+                                  {
+                                    month: "short",
+                                    day: "numeric",
+                                    year: "numeric",
+                                  },
+                                )
+                              : "—"}
+                          </td>
+                          <td style={{ padding: "12px 20px" }}>
+                            <span
+                              style={{
+                                fontSize: "0.75rem",
+                                fontWeight: 500,
+                                padding: "3px 10px",
+                                borderRadius: 999,
+                                backgroundColor: isRejected
+                                  ? "#fef2f2"
+                                  : isProcessed
+                                    ? "#f0fdf4"
+                                    : "#fff7ed",
+                                color: isRejected
+                                  ? "#ef4444"
+                                  : isProcessed
+                                    ? "#16a34a"
+                                    : "#f97316",
+                              }}
+                            >
+                              {isRejected
+                                ? "❌ Rejected"
+                                : isProcessed
+                                  ? "✅ Processed"
+                                  : "⏳ Pending"}
+                            </span>
+                          </td>
+                          <td style={{ padding: "12px 20px" }}>
+                            <ActionBtn
+                              onClick={() => togglePriority(req.id)}
+                              color={
+                                priorityIds.has(req.id) ? "#d97706" : "#6b7280"
+                              }
+                              borderColor={
+                                priorityIds.has(req.id) ? "#f59e0b" : "#d1d5db"
+                              }
+                              label={
+                                priorityIds.has(req.id)
+                                  ? "★ Unpriority"
+                                  : "☆ Priority"
+                              }
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+              {!loading && searchedReports.length > 0 && (
+                <Pagination
+                  page={reportPage}
+                  pageCount={reportPageCount}
+                  total={searchedReports.length}
+                  onPageChange={setReportPage}
+                />
+              )}
+            </div>
+          </>
         )}
       </main>
 
@@ -1139,7 +1531,7 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                   {canActOnRecord(viewModal) && (
                     <>
                       <button
-                        onClick={() => handleApprove(viewModal.id)}
+                        onClick={() => openApproveModal(viewModal)}
                         style={{
                           fontSize: "0.875rem",
                           padding: "10px 24px",
@@ -1208,6 +1600,158 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
             </div>
           );
         })()}
+
+      {approveModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(0,0,0,0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 60,
+            padding: 16,
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#fff",
+              borderRadius: 16,
+              boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+              width: "100%",
+              maxWidth: 460,
+            }}
+          >
+            <div
+              style={{
+                padding: "16px 24px",
+                borderBottom: "1px solid #f3f4f6",
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+              }}
+            >
+              <span style={{ fontSize: "1.2rem" }}>✅</span>
+              <span style={{ fontWeight: 700, color: "#111827" }}>
+                Approve Request
+              </span>
+            </div>
+
+            <div style={{ padding: "20px 24px" }}>
+              {(() => {
+                const userInfo = approveModal.uaa_user_info[0];
+                const fullName = userInfo
+                  ? `${userInfo.last_name}, ${userInfo.first_name}`.trim()
+                  : "—";
+                return (
+                  <div
+                    style={{
+                      backgroundColor: "#f9fafb",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 8,
+                      padding: "10px 14px",
+                      marginBottom: 16,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: "0.7rem",
+                        color: "#9ca3af",
+                        marginBottom: 2,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
+                      }}
+                    >
+                      Applicant
+                    </div>
+                    <div style={{ fontWeight: 600, color: "#111827" }}>
+                      {fullName}
+                    </div>
+                    <div style={{ fontSize: "0.75rem", color: "#6b7280" }}>
+                      {approveModal.tracking_id}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <label
+                style={{
+                  fontSize: "0.8rem",
+                  fontWeight: 600,
+                  color: "#374151",
+                  display: "block",
+                  marginBottom: 6,
+                }}
+              >
+                Approval note (optional)
+              </label>
+              <textarea
+                value={approveComment}
+                onChange={(e) => setApproveComment(e.target.value)}
+                rows={4}
+                placeholder="Add a note for this approval..."
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  border: "1px solid #d1d5db",
+                  borderRadius: 8,
+                  fontSize: "0.875rem",
+                  color: "#111827",
+                  resize: "vertical",
+                  outline: "none",
+                  fontFamily: "system-ui, sans-serif",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div
+              style={{
+                padding: "12px 24px",
+                backgroundColor: "#f9fafb",
+                borderRadius: "0 0 16px 16px",
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 8,
+              }}
+            >
+              <button
+                onClick={() => setApproveModal(null)}
+                disabled={sending}
+                style={{
+                  fontSize: "0.875rem",
+                  padding: "8px 16px",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  background: "#fff",
+                  color: "#6b7280",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmApprove}
+                disabled={sending}
+                style={{
+                  fontSize: "0.875rem",
+                  padding: "8px 20px",
+                  border: "none",
+                  borderRadius: 8,
+                  cursor: sending ? "not-allowed" : "pointer",
+                  background: "#16a34a",
+                  color: "#fff",
+                  fontWeight: 600,
+                  opacity: sending ? 0.6 : 1,
+                }}
+              >
+                {sending ? "Sending..." : "✅ Approve & Notify"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ══════════════════════════════════════════════════
           REJECT COMMENT MODAL — same design as Level4
@@ -1388,6 +1932,227 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
 }
 
 // ── Helper components ─────────────────────────────────────────────────
+
+function PriorityTable({
+  records,
+  onView,
+  onApprove,
+  onReject,
+  onTogglePriority,
+  priorityIds,
+}: {
+  records: SubmissionRecord[];
+  onView: (record: SubmissionRecord) => void;
+  onApprove: (record: SubmissionRecord) => void;
+  onReject: (record: SubmissionRecord) => void;
+  onTogglePriority: (id: number) => void;
+  priorityIds: Set<number>;
+}) {
+  return (
+    <table
+      style={{
+        width: "100%",
+        borderCollapse: "collapse",
+        fontSize: "0.875rem",
+      }}
+    >
+      <thead>
+        <tr
+          style={{
+            backgroundColor: "#fff7ed",
+            borderBottom: "1px solid #fde68a",
+          }}
+        >
+          {[
+            "APPLICANT",
+            "DATE SUBMITTED",
+            "OFFICE CODE",
+            "ACCOUNT TYPE",
+            "ACTIONS",
+          ].map((h) => (
+            <th
+              key={h}
+              style={{
+                textAlign: "left",
+                padding: "10px 20px",
+                fontSize: "0.7rem",
+                fontWeight: 600,
+                color: "#92400e",
+                letterSpacing: "0.05em",
+              }}
+            >
+              {h}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {records.map((req, i) => {
+          const userInfo = req.uaa_user_info[0];
+          const sysAccess = req.uaa_system_access[0];
+          const fullName = userInfo
+            ? `${userInfo.last_name}, ${userInfo.first_name} ${userInfo.middle_name ?? ""}`.trim()
+            : "—";
+
+          return (
+            <tr
+              key={req.id}
+              style={{
+                borderBottom: "1px solid #fef3c7",
+                backgroundColor: i % 2 === 0 ? "#fff" : "#fffbeb",
+              }}
+            >
+              <td style={{ padding: "14px 20px" }}>
+                <div style={{ fontWeight: 600, color: "#111827" }}>
+                  {fullName}
+                </div>
+                <div
+                  style={{
+                    fontSize: "0.75rem",
+                    color: "#9ca3af",
+                    marginTop: 2,
+                  }}
+                >
+                  {userInfo?.designation ?? "—"} •{" "}
+                  {userInfo?.employee_id ?? "—"}
+                </div>
+              </td>
+              <td style={{ padding: "14px 20px", color: "#4b5563" }}>
+                {req.submitted_at
+                  ? new Date(req.submitted_at).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })
+                  : "—"}
+              </td>
+              <td style={{ padding: "14px 20px", color: "#4b5563" }}>
+                {req.office_code ?? "—"}
+              </td>
+              <td style={{ padding: "14px 20px", color: "#4b5563" }}>
+                {sysAccess?.account_type ?? "—"}
+              </td>
+              <td style={{ padding: "14px 20px" }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <ActionBtn
+                    onClick={() => onView(req)}
+                    color="#6b7280"
+                    borderColor="#d1d5db"
+                    label="View"
+                  />
+                  <ActionBtn
+                    onClick={() => onApprove(req)}
+                    color="#16a34a"
+                    borderColor="#4ade80"
+                    label="Approve"
+                  />
+                  <ActionBtn
+                    onClick={() => onReject(req)}
+                    color="#ef4444"
+                    borderColor="#f87171"
+                    label="Reject"
+                  />
+                  <ActionBtn
+                    onClick={() => onTogglePriority(req.id)}
+                    color={priorityIds.has(req.id) ? "#d97706" : "#6b7280"}
+                    borderColor={
+                      priorityIds.has(req.id) ? "#f59e0b" : "#d1d5db"
+                    }
+                    label={
+                      priorityIds.has(req.id) ? "★ Unpriority" : "☆ Priority"
+                    }
+                  />
+                </div>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+function SearchBox({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <input
+      type="search"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder="Search name or office"
+      style={{
+        width: 220,
+        padding: "8px 12px",
+        border: "1px solid #d1d5db",
+        borderRadius: 8,
+        fontSize: "0.8rem",
+        color: "#111827",
+        outline: "none",
+      }}
+    />
+  );
+}
+
+function Pagination({
+  page,
+  pageCount,
+  total,
+  onPageChange,
+}: {
+  page: number;
+  pageCount: number;
+  total: number;
+  onPageChange: (page: number) => void;
+}) {
+  return (
+    <div
+      style={{
+        padding: "12px 20px",
+        borderTop: "1px solid #f3f4f6",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+      }}
+    >
+      <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>
+        Page {page} of {pageCount} • {total} request{total === 1 ? "" : "s"}
+      </span>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          onClick={() => onPageChange(Math.max(1, page - 1))}
+          disabled={page <= 1}
+          style={pagerButtonStyle(page <= 1)}
+        >
+          Previous
+        </button>
+        <button
+          onClick={() => onPageChange(Math.min(pageCount, page + 1))}
+          disabled={page >= pageCount}
+          style={pagerButtonStyle(page >= pageCount)}
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function pagerButtonStyle(disabled: boolean): CSSProperties {
+  return {
+    border: "1px solid #d1d5db",
+    background: disabled ? "#f3f4f6" : "#fff",
+    color: disabled ? "#9ca3af" : "#374151",
+    borderRadius: 8,
+    padding: "6px 12px",
+    cursor: disabled ? "not-allowed" : "pointer",
+    fontSize: "0.75rem",
+  };
+}
 
 function SectionTitle({ label }: { label: string }) {
   return (

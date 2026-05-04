@@ -17,6 +17,7 @@ export interface SubmissionRecord {
     last_name: string | null;
     first_name: string | null;
     middle_name: string | null;
+    username: string | null;
     designation: string | null;
     employee_id: string | null;
     contact_no: string | null;

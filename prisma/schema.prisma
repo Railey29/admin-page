@@ -66,6 +66,7 @@ model uaa_user_info {
   last_name       String?
   first_name      String?
   middle_name     String?
+  username        String?
   designation     String?
   employee_id     String?
   contact_no      String?
