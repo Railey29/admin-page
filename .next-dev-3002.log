@@ -114,3 +114,669 @@ Creating turbopack project {
 ✓ Compiled in 380ms
 ✓ Compiled in 250ms
  GET / 200 in 514ms (next.js: 273ms, application-code: 242ms)
+✓ Compiled in 478ms
+ GET / 200 in 852ms (next.js: 316ms, application-code: 537ms)
+ GET /api/submissions 200 in 9.0s (next.js: 31ms, application-code: 9.0s)
+ GET /api/submissions 200 in 1072ms (next.js: 10ms, application-code: 1061ms)
+✓ Compiled in 340ms
+Fetch error: [object ErrorEvent]
+ GET /api/submissions 500 in 348ms (next.js: 5ms, application-code: 343ms)
+ GET / 200 in 1270ms (next.js: 742ms, application-code: 528ms)
+Fetch error: [object ErrorEvent]
+ GET /api/submissions 500 in 10.9s (next.js: 34ms, application-code: 10.8s)
+Fetch error: [object ErrorEvent]
+ GET /api/submissions 500 in 10.7s (next.js: 4ms, application-code: 10.7s)
+✓ Compiled in 123ms
+Fetch error: [object ErrorEvent]
+ GET /api/submissions 500 in 10.7s (next.js: 4ms, application-code: 10.7s)
+ POST /api/login 401 in 4.8s (next.js: 10ms, application-code: 4.8s)
+[browser] Login failed: Invalid username or password. 
+    at login (app/hooks/useAdminAuth.ts:35:17)
+    at async handleSubmit (app/components/form/LoginPage.tsx:20:21)
+  33 |       if (!res.ok) {
+  34 |         const err = await res.json();
+> 35 |         console.error("Login failed:", err.error);
+     |                 ^
+  36 |         return false;
+  37 |       }
+  38 | (app/hooks/useAdminAuth.ts:35:17)
+✓ Compiled in 90ms
+ POST /api/login 401 in 2.6s (next.js: 5ms, application-code: 2.6s)
+[browser] Login failed: Invalid username or password. 
+    at login (app/hooks/useAdminAuth.ts:35:17)
+    at async handleSubmit (app/components/form/LoginPage.tsx:20:21)
+  33 |       if (!res.ok) {
+  34 |         const err = await res.json();
+> 35 |         console.error("Login failed:", err.error);
+     |                 ^
+  36 |         return false;
+  37 |       }
+  38 | (app/hooks/useAdminAuth.ts:35:17)
+ POST /api/login 401 in 402ms (next.js: 2ms, application-code: 399ms)
+[browser] Login failed: Invalid username or password. 
+    at login (app/hooks/useAdminAuth.ts:35:17)
+    at async handleSubmit (app/components/form/LoginPage.tsx:20:21)
+  33 |       if (!res.ok) {
+  34 |         const err = await res.json();
+> 35 |         console.error("Login failed:", err.error);
+     |                 ^
+  36 |         return false;
+  37 |       }
+  38 | (app/hooks/useAdminAuth.ts:35:17)
+ POST /api/login 200 in 29ms (next.js: 12ms, application-code: 17ms)
+ GET /api/submissions 200 in 5.2s (next.js: 4ms, application-code: 5.2s)
+ GET / 200 in 257ms (next.js: 97ms, application-code: 160ms)
+ POST /api/login 200 in 7ms (next.js: 1775µs, application-code: 5ms)
+ GET /api/submissions 200 in 697ms (next.js: 3ms, application-code: 694ms)
+ GET /api/submissions 200 in 1076ms (next.js: 7ms, application-code: 1069ms)
+ POST /api/login 200 in 2.5s (next.js: 8ms, application-code: 2.5s)
+ GET /api/submissions 200 in 3.3s (next.js: 4ms, application-code: 3.3s)
+ GET /api/submissions 200 in 918ms (next.js: 6ms, application-code: 913ms)
+✓ Compiled in 392ms
+✓ Compiled in 508ms
+ GET /api/submissions 200 in 3.6s (next.js: 3ms, application-code: 3.6s)
+✓ Compiled in 336ms
+ GET /api/submissions 200 in 3.7s (next.js: 4ms, application-code: 3.7s)
+✓ Compiled in 152ms
+✓ Compiled in 367ms
+ GET /api/submissions 200 in 5.1s (next.js: 11ms, application-code: 5.1s)
+✓ Compiled in 476ms
+ GET / 200 in 306ms (next.js: 183ms, application-code: 123ms)
+ GET /api/submissions 200 in 5.3s (next.js: 6ms, application-code: 5.2s)
+ GET /api/submissions 200 in 921ms (next.js: 4ms, application-code: 917ms)
+✓ Compiled in 1359ms
+⨯ ./app/components/form/Level4Dashboard.tsx:825:15
+Expected '</', got ')'
+  [90m823 |[0m                   </table>
+  [90m824 |[0m                 )
+[31m[1m>[0m [90m825 |[0m               ) : loading ? (
+  [90m    |[0m               [31m[1m^[0m
+  [90m826 |[0m                 <div
+  [90m827 |[0m                   style={{
+  [90m828 |[0m                     padding: [32m"40px 20px"[0m,
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./app/components/form/Level4Dashboard.tsx [Client Component Browser]
+    ./app/components/form/Dashboard.tsx [Client Component Browser]
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/components/form/Level4Dashboard.tsx [Client Component SSR]
+    ./app/components/form/Dashboard.tsx [Client Component SSR]
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component]
+
+
+
+./app/components/form/Level1to3Dashboard.tsx:1158:10
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+  [90m1156 |[0m             )}
+  [90m1157 |[0m           </div>
+[31m[1m>[0m [90m1158 |[0m         )}
+  [90m     |[0m          [31m[1m^[0m
+  [90m1159 |[0m       </main>
+  [90m1160 |[0m
+  [90m1161 |[0m       {/* ══════════════════════════════════════════════════
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./app/components/form/Level1to3Dashboard.tsx [Client Component Browser]
+    ./app/components/form/Dashboard.tsx [Client Component Browser]
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/components/form/Level1to3Dashboard.tsx [Client Component SSR]
+    ./app/components/form/Dashboard.tsx [Client Component SSR]
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component]
+
+
+ GET / 500 in 789ms (next.js: 462ms, application-code: 326ms)
+⨯ ./app/components/form/Level4Dashboard.tsx:825:15
+Expected '</', got ')'
+  [90m823 |[0m                   </table>
+  [90m824 |[0m                 )
+[31m[1m>[0m [90m825 |[0m               ) : loading ? (
+  [90m    |[0m               [31m[1m^[0m
+  [90m826 |[0m                 <div
+  [90m827 |[0m                   style={{
+  [90m828 |[0m                     padding: [32m"40px 20px"[0m,
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./app/components/form/Level4Dashboard.tsx [Client Component Browser]
+    ./app/components/form/Dashboard.tsx [Client Component Browser]
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/components/form/Level4Dashboard.tsx [Client Component SSR]
+    ./app/components/form/Dashboard.tsx [Client Component SSR]
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component]
+
+
+
+./app/components/form/Level1to3Dashboard.tsx:1158:10
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+  [90m1156 |[0m             )}
+  [90m1157 |[0m           </div>
+[31m[1m>[0m [90m1158 |[0m         )}
+  [90m     |[0m          [31m[1m^[0m
+  [90m1159 |[0m       </main>
+  [90m1160 |[0m
+  [90m1161 |[0m       {/* ══════════════════════════════════════════════════
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./app/components/form/Level1to3Dashboard.tsx [Client Component Browser]
+    ./app/components/form/Dashboard.tsx [Client Component Browser]
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/components/form/Level1to3Dashboard.tsx [Client Component SSR]
+    ./app/components/form/Dashboard.tsx [Client Component SSR]
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component]
+
+
+ GET / 500 in 149ms (next.js: 91ms, application-code: 58ms)
+⨯ ./app/components/form/Level4Dashboard.tsx:825:15
+Expected '</', got ')'
+  [90m823 |[0m                   </table>
+  [90m824 |[0m                 )
+[31m[1m>[0m [90m825 |[0m               ) : loading ? (
+  [90m    |[0m               [31m[1m^[0m
+  [90m826 |[0m                 <div
+  [90m827 |[0m                   style={{
+  [90m828 |[0m                     padding: [32m"40px 20px"[0m,
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./app/components/form/Level4Dashboard.tsx [Client Component Browser]
+    ./app/components/form/Dashboard.tsx [Client Component Browser]
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/components/form/Level4Dashboard.tsx [Client Component SSR]
+    ./app/components/form/Dashboard.tsx [Client Component SSR]
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component]
+
+
+
+./app/components/form/Level1to3Dashboard.tsx:1158:10
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+  [90m1156 |[0m             )}
+  [90m1157 |[0m           </div>
+[31m[1m>[0m [90m1158 |[0m         )}
+  [90m     |[0m          [31m[1m^[0m
+  [90m1159 |[0m       </main>
+  [90m1160 |[0m
+  [90m1161 |[0m       {/* ══════════════════════════════════════════════════
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./app/components/form/Level1to3Dashboard.tsx [Client Component Browser]
+    ./app/components/form/Dashboard.tsx [Client Component Browser]
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/components/form/Level1to3Dashboard.tsx [Client Component SSR]
+    ./app/components/form/Dashboard.tsx [Client Component SSR]
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component]
+
+
+⨯ ./app/components/form/Level4Dashboard.tsx:825:15
+Expected '</', got ')'
+  [90m823 |[0m                   </table>
+  [90m824 |[0m                 )
+[31m[1m>[0m [90m825 |[0m               ) : loading ? (
+  [90m    |[0m               [31m[1m^[0m
+  [90m826 |[0m                 <div
+  [90m827 |[0m                   style={{
+  [90m828 |[0m                     padding: [32m"40px 20px"[0m,
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./app/components/form/Level4Dashboard.tsx [Client Component Browser]
+    ./app/components/form/Dashboard.tsx [Client Component Browser]
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/components/form/Level4Dashboard.tsx [Client Component SSR]
+    ./app/components/form/Dashboard.tsx [Client Component SSR]
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component]
+
+
+
+./app/components/form/Level1to3Dashboard.tsx:1158:10
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+  [90m1156 |[0m             )}
+  [90m1157 |[0m           </div>
+[31m[1m>[0m [90m1158 |[0m         )}
+  [90m     |[0m          [31m[1m^[0m
+  [90m1159 |[0m       </main>
+  [90m1160 |[0m
+  [90m1161 |[0m       {/* ══════════════════════════════════════════════════
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./app/components/form/Level1to3Dashboard.tsx [Client Component Browser]
+    ./app/components/form/Dashboard.tsx [Client Component Browser]
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/components/form/Level1to3Dashboard.tsx [Client Component SSR]
+    ./app/components/form/Dashboard.tsx [Client Component SSR]
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component]
+
+
+ GET / 500 in 67ms (next.js: 25ms, application-code: 42ms)
+ GET / 500 in 61ms (next.js: 37ms, application-code: 24ms)
+[browser] Uncaught Error: ./app/components/form/Level4Dashboard.tsx:825:15
+Expected '</', got ')'
+  823 |                   </table>
+  824 |                 )
+> 825 |               ) : loading ? (
+      |               ^
+  826 |                 <div
+  827 |                   style={{
+  828 |                     padding: "40px 20px",
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./app/components/form/Level4Dashboard.tsx [Client Component Browser]
+    ./app/components/form/Dashboard.tsx [Client Component Browser]
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/components/form/Level4Dashboard.tsx [Client Component SSR]
+    ./app/components/form/Dashboard.tsx [Client Component SSR]
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component]
+
+
+    at <unknown> (Error: ./app/components/form/Level4Dashboard.tsx:825:15)
+    at <unknown> (Error: (./app/components/form/Level4Dashboard.tsx:825:15)
+⨯ ./app/components/form/Level4Dashboard.tsx:824:18
+Unterminated regexp literal
+  [90m822 |[0m                     </tbody>
+  [90m823 |[0m                   </table>
+[31m[1m>[0m [90m824 |[0m                 </>
+  [90m    |[0m                  [31m[1m^^[0m
+  [90m825 |[0m               ) : loading ? (
+  [90m826 |[0m                 <div
+  [90m827 |[0m                   style={{
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./app/components/form/Level4Dashboard.tsx [Client Component Browser]
+    ./app/components/form/Dashboard.tsx [Client Component Browser]
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/components/form/Level4Dashboard.tsx [Client Component SSR]
+    ./app/components/form/Dashboard.tsx [Client Component SSR]
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component]
+
+
+ GET / 500 in 210ms (next.js: 159ms, application-code: 51ms)
+[browser] Uncaught Error: ./app/components/form/Level4Dashboard.tsx:824:18
+Unterminated regexp literal
+  822 |                     </tbody>
+  823 |                   </table>
+> 824 |                 </>
+      |                  ^^
+  825 |               ) : loading ? (
+  826 |                 <div
+  827 |                   style={{
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./app/components/form/Level4Dashboard.tsx [Client Component Browser]
+    ./app/components/form/Dashboard.tsx [Client Component Browser]
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/components/form/Level4Dashboard.tsx [Client Component SSR]
+    ./app/components/form/Dashboard.tsx [Client Component SSR]
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component]
+
+
+    at <unknown> (Error: ./app/components/form/Level4Dashboard.tsx:824:18)
+    at <unknown> (Error: (./app/components/form/Level4Dashboard.tsx:824:18)
+[browser] ./app/components/form/Level4Dashboard.tsx:824:18
+Unterminated regexp literal
+  822 |                     </tbody>
+  823 |                   </table>
+> 824 |                 </>
+      |                  ^^
+  825 |               ) : loading ? (
+  826 |                 <div
+  827 |                   style={{
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./app/components/form/Level4Dashboard.tsx [Client Component Browser]
+    ./app/components/form/Dashboard.tsx [Client Component Browser]
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/components/form/Level4Dashboard.tsx [Client Component SSR]
+    ./app/components/form/Dashboard.tsx [Client Component SSR]
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component] 
+[browser] ./app/components/form/Level4Dashboard.tsx:824:18
+Unterminated regexp literal
+  822 |                     </tbody>
+  823 |                   </table>
+> 824 |                 </>
+      |                  ^^
+  825 |               ) : loading ? (
+  826 |                 <div
+  827 |                   style={{
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./app/components/form/Level4Dashboard.tsx [Client Component Browser]
+    ./app/components/form/Dashboard.tsx [Client Component Browser]
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/components/form/Level4Dashboard.tsx [Client Component SSR]
+    ./app/components/form/Dashboard.tsx [Client Component SSR]
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component] 
+[browser] ./app/components/form/Level4Dashboard.tsx:824:18
+Unterminated regexp literal
+  822 |                     </tbody>
+  823 |                   </table>
+> 824 |                 </>
+      |                  ^^
+  825 |               ) : loading ? (
+  826 |                 <div
+  827 |                   style={{
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./app/components/form/Level4Dashboard.tsx [Client Component Browser]
+    ./app/components/form/Dashboard.tsx [Client Component Browser]
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/components/form/Level4Dashboard.tsx [Client Component SSR]
+    ./app/components/form/Dashboard.tsx [Client Component SSR]
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component] 
+⨯ ./app/components/form/Level4Dashboard.tsx:824:18
+Unterminated regexp literal
+  [90m822 |[0m                     </tbody>
+  [90m823 |[0m                   </table>
+[31m[1m>[0m [90m824 |[0m                 </>
+  [90m    |[0m                  [31m[1m^^[0m
+  [90m825 |[0m               ) : loading ? (
+  [90m826 |[0m                 <div
+  [90m827 |[0m                   style={{
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./app/components/form/Level4Dashboard.tsx [Client Component Browser]
+    ./app/components/form/Dashboard.tsx [Client Component Browser]
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/components/form/Level4Dashboard.tsx [Client Component SSR]
+    ./app/components/form/Dashboard.tsx [Client Component SSR]
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component]
+
+
+ GET / 500 in 37ms (next.js: 11ms, application-code: 26ms)
+[browser] Uncaught Error: ./app/components/form/Level4Dashboard.tsx:824:18
+Unterminated regexp literal
+  822 |                     </tbody>
+  823 |                   </table>
+> 824 |                 </>
+      |                  ^^
+  825 |               ) : loading ? (
+  826 |                 <div
+  827 |                   style={{
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./app/components/form/Level4Dashboard.tsx [Client Component Browser]
+    ./app/components/form/Dashboard.tsx [Client Component Browser]
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/components/form/Level4Dashboard.tsx [Client Component SSR]
+    ./app/components/form/Dashboard.tsx [Client Component SSR]
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component]
+
+
+    at <unknown> (Error: ./app/components/form/Level4Dashboard.tsx:824:18)
+    at <unknown> (Error: (./app/components/form/Level4Dashboard.tsx:824:18)
+[browser] ./app/components/form/Level4Dashboard.tsx:824:18
+Unterminated regexp literal
+  822 |                     </tbody>
+  823 |                   </table>
+> 824 |                 </>
+      |                  ^^
+  825 |               ) : loading ? (
+  826 |                 <div
+  827 |                   style={{
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./app/components/form/Level4Dashboard.tsx [Client Component Browser]
+    ./app/components/form/Dashboard.tsx [Client Component Browser]
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/components/form/Level4Dashboard.tsx [Client Component SSR]
+    ./app/components/form/Dashboard.tsx [Client Component SSR]
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component] 
+[browser] ./app/components/form/Level4Dashboard.tsx:824:18
+Unterminated regexp literal
+  822 |                     </tbody>
+  823 |                   </table>
+> 824 |                 </>
+      |                  ^^
+  825 |               ) : loading ? (
+  826 |                 <div
+  827 |                   style={{
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./app/components/form/Level4Dashboard.tsx [Client Component Browser]
+    ./app/components/form/Dashboard.tsx [Client Component Browser]
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/components/form/Level4Dashboard.tsx [Client Component SSR]
+    ./app/components/form/Dashboard.tsx [Client Component SSR]
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component] 
+[browser] ./app/components/form/Level4Dashboard.tsx:824:18
+Unterminated regexp literal
+  822 |                     </tbody>
+  823 |                   </table>
+> 824 |                 </>
+      |                  ^^
+  825 |               ) : loading ? (
+  826 |                 <div
+  827 |                   style={{
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./app/components/form/Level4Dashboard.tsx [Client Component Browser]
+    ./app/components/form/Dashboard.tsx [Client Component Browser]
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/components/form/Level4Dashboard.tsx [Client Component SSR]
+    ./app/components/form/Dashboard.tsx [Client Component SSR]
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component] 
+[browser] ./app/components/form/Level4Dashboard.tsx:824:18
+Unterminated regexp literal
+  822 |                     </tbody>
+  823 |                   </table>
+> 824 |                 </>
+      |                  ^^
+  825 |               ) : loading ? (
+  826 |                 <div
+  827 |                   style={{
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./app/components/form/Level4Dashboard.tsx [Client Component Browser]
+    ./app/components/form/Dashboard.tsx [Client Component Browser]
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/components/form/Level4Dashboard.tsx [Client Component SSR]
+    ./app/components/form/Dashboard.tsx [Client Component SSR]
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component] 
+[browser] ./app/components/form/Level4Dashboard.tsx:824:18
+Unterminated regexp literal
+  822 |                     </tbody>
+  823 |                   </table>
+> 824 |                 </div>
+      |                  ^^^^^
+  825 |               ) : loading ? (
+  826 |                 <div
+  827 |                   style={{
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./app/components/form/Level4Dashboard.tsx [Client Component Browser]
+    ./app/components/form/Dashboard.tsx [Client Component Browser]
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/components/form/Level4Dashboard.tsx [Client Component SSR]
+    ./app/components/form/Dashboard.tsx [Client Component SSR]
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component] 
+✓ Compiled in 245ms
+ GET / 200 in 1025ms (next.js: 437ms, application-code: 588ms)
+ GET /api/submissions 200 in 10.7s (next.js: 372ms, application-code: 10.4s)
+ GET /api/submissions 200 in 1007ms (next.js: 4ms, application-code: 1003ms)
+✓ Compiled in 132ms
+✓ Compiled in 163ms
+ GET /api/submissions 200 in 5.0s (next.js: 3ms, application-code: 5.0s)
+ GET / 200 in 736ms (next.js: 192ms, application-code: 544ms)
+ GET /api/submissions 200 in 904ms (next.js: 6ms, application-code: 898ms)
+ GET /api/submissions 200 in 569ms (next.js: 4ms, application-code: 564ms)
+✓ Compiled in 278ms
+ GET / 200 in 867ms (next.js: 191ms, application-code: 676ms)
+ GET /api/submissions 200 in 5.6s (next.js: 14ms, application-code: 5.6s)
+ GET /api/submissions 200 in 1288ms (next.js: 3ms, application-code: 1285ms)
+✓ Compiled in 181ms
+ GET / 200 in 619ms (next.js: 161ms, application-code: 459ms)
+ GET /api/submissions 200 in 6.4s (next.js: 31ms, application-code: 6.4s)
+ GET /api/submissions 200 in 888ms (next.js: 3ms, application-code: 885ms)
+✓ Compiled in 185ms
+ GET /api/submissions 200 in 1119ms (next.js: 3ms, application-code: 1116ms)
+✓ Compiled in 219ms
+ GET /api/submissions 200 in 831ms (next.js: 11ms, application-code: 820ms)
+✓ Compiled in 137ms
+ GET /api/submissions 200 in 2.6s (next.js: 5ms, application-code: 2.6s)
+ GET / 200 in 421ms (next.js: 116ms, application-code: 306ms)
+ GET /api/submissions 200 in 5.0s (next.js: 8ms, application-code: 5.0s)
+ GET /api/submissions 200 in 831ms (next.js: 4ms, application-code: 827ms)
+✓ Compiled in 128ms
+✓ Compiled in 495ms
+ GET /api/submissions 200 in 2.1s (next.js: 5ms, application-code: 2.1s)
+ GET / 200 in 308ms (next.js: 119ms, application-code: 190ms)
+ GET /api/submissions 200 in 6.9s (next.js: 8ms, application-code: 6.9s)
+ GET /api/submissions 200 in 1885ms (next.js: 4ms, application-code: 1882ms)
+✓ Compiled in 879ms
+✓ Compiled in 250ms
+ GET /api/submissions 200 in 4.7s (next.js: 6ms, application-code: 4.7s)
+✓ Compiled in 154ms
+ GET /api/submissions 200 in 5.3s (next.js: 17ms, application-code: 5.3s)
+ GET / 200 in 551ms (next.js: 273ms, application-code: 277ms)
+ GET /api/submissions 200 in 2.8s (next.js: 6ms, application-code: 2.8s)
+ GET /api/submissions 200 in 861ms (next.js: 14ms, application-code: 846ms)
+✓ Compiled in 171ms
+ GET / 200 in 844ms (next.js: 319ms, application-code: 525ms)
+ GET /api/submissions 200 in 14.2s (next.js: 12ms, application-code: 14.2s)
+ GET / 200 in 77ms (next.js: 7ms, application-code: 71ms)
+Fetch error: Control plane request failed
+Fetch error: Control plane request failed
+ GET /api/submissions 500 in 29.1s (next.js: 2ms, application-code: 29.1s)
+ GET /api/submissions 200 in 51s (next.js: 10ms, application-code: 51s)
