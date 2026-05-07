@@ -43,6 +43,7 @@ model uaa_submissions {
   approved_by_l2    Boolean?            @default(false)
   approved_by_l3    Boolean?            @default(false)
   approved_by_l4    Boolean?            @default(false)
+  isPriority        Boolean             @default(false)
   uaa_modules       uaa_modules[]
   uaa_system_access uaa_system_access[]
   uaa_user_info     uaa_user_info[]

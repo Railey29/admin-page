@@ -11,7 +11,17 @@ export async function GET() {
       },
       orderBy: { submitted_at: "asc" },
     });
-    return NextResponse.json({ success: true, data: submissions });
+    const priorityRows = await prisma.$queryRaw<
+      { id: number; isPriority: boolean | null }[]
+    >`SELECT id, "isPriority" FROM uaa_submissions`;
+    const priorityMap = new Map(
+      priorityRows.map((row) => [row.id, row.isPriority ?? false]),
+    );
+    const data = submissions.map((submission) => ({
+      ...submission,
+      isPriority: priorityMap.get(submission.id) ?? false,
+    }));
+    return NextResponse.json({ success: true, data });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("Fetch error:", message);

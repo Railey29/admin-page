@@ -1,6 +1,6 @@
 "use client";
 import type { CSSProperties } from "react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AdminCredential } from "../../models/authModel";
 import { useSubmissions, SubmissionRecord } from "../../hooks/useSubmissions";
 import { EmailPayload } from "../../models/emailModel";
@@ -19,7 +19,7 @@ type SubmissionWithApprovers = SubmissionRecord & {
   approved_by_l3_name?: string | null;
   approved_by_l4_name?: string | null;
 };
-type DateFilter = "today" | "thisWeek" | "thisMonth" | "thisYear" | "allTime";
+type DateFilter = "today" | "thisWeek" | "thisMonth" | "thisYear" | "allTime" | "priority";
 const PAGE_SIZE = 4;
 
 const dateFilterLabels: Record<DateFilter, string> = {
@@ -28,6 +28,7 @@ const dateFilterLabels: Record<DateFilter, string> = {
   thisMonth: "This Month",
   thisYear: "This Year",
   allTime: "All Time",
+  priority: "Priority",
 };
 
 const dateFilters: DateFilter[] = [
@@ -36,6 +37,7 @@ const dateFilters: DateFilter[] = [
   "thisMonth",
   "thisYear",
   "allTime",
+  "priority",
 ];
 
 function startOfDay(date: Date) {
@@ -107,29 +109,9 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState<DateFilter>("thisWeek");
   const [page, setPage] = useState(1);
-  const [priorityPage, setPriorityPage] = useState(1);
   const [reportPage, setReportPage] = useState(1);
-  const [reportPriorityPage, setReportPriorityPage] = useState(1);
-  const [priorityIds, setPriorityIds] = useState<Set<number>>(new Set());
 
-  const { submissions, loading, approve, reject } = useSubmissions(4);
-  const priorityStorageKey = "lto_priority_level_4";
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(priorityStorageKey);
-      if (stored) setPriorityIds(new Set(JSON.parse(stored)));
-    } catch {
-      localStorage.removeItem(priorityStorageKey);
-    }
-  }, [priorityStorageKey]);
-
-  useEffect(() => {
-    localStorage.setItem(
-      priorityStorageKey,
-      JSON.stringify(Array.from(priorityIds)),
-    );
-  }, [priorityIds, priorityStorageKey]);
+  const { submissions, loading, approve, reject, togglePriority } = useSubmissions(4);
 
   const handleRegisterAccount = async (data: {
     ltoEmployeeNumber: string;
@@ -219,20 +201,22 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
     }
   };
 
-  const currentList =
-    tab === "toProcess" ? toProcess : tab === "done" ? done : issues;
   const getApplicantName = (record: SubmissionRecord) => {
     const userInfo = record.uaa_user_info[0];
     return userInfo
       ? `${userInfo.last_name ?? ""}, ${userInfo.first_name ?? ""} ${userInfo.middle_name ?? ""}`.trim()
       : "";
   };
-  const dateFilteredList = sortByFifoDate(
-    currentList.filter((record) =>
-      isWithinDateFilter(record.submitted_at, dateFilter),
+  const isPriorityFilterActive = dateFilter === "priority";
+  const filteredList = sortByFifoDate(
+    (tab === "toProcess" ? toProcess : tab === "done" ? done : issues).filter(
+      (record) =>
+        isPriorityFilterActive
+          ? record.isPriority
+          : isWithinDateFilter(record.submitted_at, dateFilter),
     ),
   );
-  const allFilteredList = dateFilteredList.filter((record) => {
+  const searchedCurrentList = filteredList.filter((record) => {
     const query = searchTerm.trim().toLowerCase();
     if (!query) return true;
     return (
@@ -240,17 +224,11 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
       (record.office_code ?? "").toLowerCase().includes(query)
     );
   });
-  const priorityList =
-    tab === "toProcess"
-      ? allFilteredList.filter((record) => priorityIds.has(record.id))
-      : [];
-  const filteredList =
-    tab === "toProcess"
-      ? allFilteredList.filter((record) => !priorityIds.has(record.id))
-      : allFilteredList;
   const reportList = sortByFifoDate(
     submissions.filter((record) =>
-      isWithinDateFilter(record.submitted_at, dateFilter),
+      isPriorityFilterActive
+        ? record.isPriority
+        : isWithinDateFilter(record.submitted_at, dateFilter),
     ),
   );
   const searchedReports = reportList.filter((record) => {
@@ -261,57 +239,21 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
       (record.office_code ?? "").toLowerCase().includes(query)
     );
   });
-  const reportPriorityList = searchedReports.filter((record) =>
-    priorityIds.has(record.id),
-  );
-  const reportNonPriorityList = searchedReports.filter(
-    (record) => !priorityIds.has(record.id),
-  );
-  const reportPriorityCount = reportPriorityList.length;
-  const reportPriorityPageCount = Math.max(
-    1,
-    Math.ceil(reportPriorityList.length / PAGE_SIZE),
-  );
-  const pagedReportPriority = reportPriorityList.slice(
-    (reportPriorityPage - 1) * PAGE_SIZE,
-    reportPriorityPage * PAGE_SIZE,
-  );
-  const reportPageCount = Math.max(
-    1,
-    Math.ceil(reportNonPriorityList.length / PAGE_SIZE),
-  );
-  const pagedReports = reportNonPriorityList.slice(
+  const pagedReports = searchedReports.slice(
     (reportPage - 1) * PAGE_SIZE,
     reportPage * PAGE_SIZE,
   );
-  const priorityPageCount = Math.max(
-    1,
-    Math.ceil(priorityList.length / PAGE_SIZE),
-  );
-  const pagedPriority = priorityList.slice(
-    (priorityPage - 1) * PAGE_SIZE,
-    priorityPage * PAGE_SIZE,
-  );
-  const pageCount = Math.max(1, Math.ceil(filteredList.length / PAGE_SIZE));
-  const pagedList = filteredList.slice(
+  const pageCount = Math.max(1, Math.ceil(searchedCurrentList.length / PAGE_SIZE));
+  const pagedList = searchedCurrentList.slice(
     (page - 1) * PAGE_SIZE,
     page * PAGE_SIZE,
   );
 
-  const togglePriority = (id: number) => {
-    setPriorityIds((current) => {
-      const next = new Set(current);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
+  const handleTogglePriority = async (id: number) => {
+    const success = await togglePriority(id);
+    if (!success) return;
     setPage(1);
-    setPriorityPage(1);
     setReportPage(1);
-    setReportPriorityPage(1);
   };
 
   const tabs: { key: Tab; icon: string; label: string }[] = [
@@ -399,7 +341,6 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
             onClick={() => {
               setTab(t.key);
               setPage(1);
-              setPriorityPage(1);
               setReportPage(1);
             }}
             style={{
@@ -512,7 +453,6 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                       onClick={() => {
                         setDateFilter(f);
                         setPage(1);
-                        setPriorityPage(1);
                         setReportPage(1);
                       }}
                       style={{
@@ -532,11 +472,7 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                   ))}
                 </div>
                 <ExportButtons
-                  records={
-                    tab === "reports"
-                      ? searchedReports
-                      : [...priorityList, ...filteredList]
-                  }
+                  records={tab === "reports" ? searchedReports : searchedCurrentList}
                   filename={
                     tab === "reports"
                       ? `l4-reports-${dateFilter}`
@@ -553,7 +489,6 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                   onChange={(value) => {
                     setSearchTerm(value);
                     setPage(1);
-                    setPriorityPage(1);
                     setReportPage(1);
                   }}
                 />
@@ -573,111 +508,8 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                 </div>
               )}
 
-              {tab === "toProcess" && (
-                <div
-                  style={{
-                    borderBottom: "1px solid #f3f4f6",
-                    backgroundColor: "#fffbeb",
-                  }}
-                >
-                  <div
-                    style={{
-                      padding: "14px 20px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      borderBottom:
-                        priorityList.length > 0 ? "1px solid #fde68a" : "none",
-                    }}
-                  >
-                    <span style={{ fontWeight: 700, color: "#92400e" }}>
-                      ⭐ Priority Requests
-                    </span>
-                    <span style={{ fontSize: "0.75rem", color: "#b45309" }}>
-                      {priorityList.length} prioritized
-                    </span>
-                  </div>
-                  {priorityList.length === 0 ? (
-                    <div
-                      style={{
-                        padding: "0 20px 16px",
-                        color: "#b45309",
-                        fontSize: "0.875rem",
-                      }}
-                    >
-                      Click the star beside Mark Done/Flag Issue to move a
-                      request here.
-                    </div>
-                  ) : (
-                    <>
-                      <PriorityTable
-                        records={pagedPriority}
-                        onView={setViewModal}
-                        onDone={(record) => openCommentModal(record, "done")}
-                        onIssue={(record) => openCommentModal(record, "issue")}
-                        onTogglePriority={togglePriority}
-                        priorityIds={priorityIds}
-                      />
-                      <Pagination
-                        page={priorityPage}
-                        pageCount={priorityPageCount}
-                        total={priorityList.length}
-                        onPageChange={setPriorityPage}
-                      />
-                    </>
-                  )}
-                </div>
-              )}
-
               {tab === "reports" ? (
                 <div>
-                  {reportPriorityCount > 0 && (
-                    <div
-                      style={{
-                        backgroundColor: "#fff",
-                        borderRadius: 12,
-                        border: "1px solid #fde68a",
-                        overflow: "hidden",
-                        marginBottom: 16,
-                      }}
-                    >
-                      <div
-                        style={{
-                          padding: "14px 20px",
-                          borderBottom: "1px solid #fef3c7",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          backgroundColor: "#fffbeb",
-                        }}
-                      >
-                        <span style={{ fontWeight: 700, color: "#92400e" }}>
-                          ⭐ Priority Requests
-                        </span>
-                        <span style={{ fontSize: "0.75rem", color: "#b45309" }}>
-                          {reportPriorityCount} prioritized
-                        </span>
-                      </div>
-                      <div style={{ padding: "16px 20px" }}>
-                        <PriorityTable
-                          records={pagedReportPriority}
-                          onView={setViewModal}
-                          onDone={(record) => openCommentModal(record, "done")}
-                          onIssue={(record) =>
-                            openCommentModal(record, "issue")
-                          }
-                          onTogglePriority={togglePriority}
-                          priorityIds={priorityIds}
-                        />
-                        <Pagination
-                          page={reportPriorityPage}
-                          pageCount={reportPriorityPageCount}
-                          total={reportPriorityCount}
-                          onPageChange={setReportPriorityPage}
-                        />
-                      </div>
-                    </div>
-                  )}
                   {loading && (
                     <div
                       style={{
@@ -690,7 +522,7 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                       Loading report submissions...
                     </div>
                   )}
-                  {!loading && reportNonPriorityList.length === 0 && (
+                  {!loading && searchedReports.length === 0 && (
                     <div
                       style={{
                         padding: "40px 20px",
@@ -702,7 +534,7 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                       No submissions match your search.
                     </div>
                   )}
-                  {!loading && reportNonPriorityList.length > 0 && (
+                  {!loading && searchedReports.length > 0 && (
                     <table
                       style={{
                         width: "100%",
@@ -838,19 +670,19 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                               </td>
                               <td style={{ padding: "14px 20px" }}>
                                 <ActionBtn
-                                  onClick={() => togglePriority(req.id)}
+                                  onClick={() => void handleTogglePriority(req.id)}
                                   color={
-                                    priorityIds.has(req.id)
+                                    req.isPriority
                                       ? "#d97706"
                                       : "#6b7280"
                                   }
                                   borderColor={
-                                    priorityIds.has(req.id)
+                                    req.isPriority
                                       ? "#f59e0b"
                                       : "#d1d5db"
                                   }
                                   label={
-                                    priorityIds.has(req.id)
+                                    req.isPriority
                                       ? "★ Unpriority"
                                       : "☆ Priority"
                                   }
@@ -874,7 +706,7 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                 >
                   Loading submissions...
                 </div>
-              ) : filteredList.length === 0 ? (
+              ) : searchedCurrentList.length === 0 ? (
                 <div
                   style={{
                     padding: "40px 20px",
@@ -1041,11 +873,11 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                                     label="❌ Flag Issue"
                                   />
                                   <ActionBtn
-                                    onClick={() => togglePriority(req.id)}
+                                    onClick={() => void handleTogglePriority(req.id)}
                                     color="#d97706"
                                     borderColor="#f59e0b"
                                     label={
-                                      priorityIds.has(req.id)
+                                      req.isPriority
                                         ? "★ Unpriority"
                                         : "☆ Priority"
                                     }
@@ -1088,11 +920,11 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                   </tbody>
                 </table>
               )}
-              {!loading && filteredList.length > 0 && (
+              {!loading && searchedCurrentList.length > 0 && (
                 <Pagination
                   page={page}
                   pageCount={pageCount}
-                  total={filteredList.length}
+                  total={searchedCurrentList.length}
                   onPageChange={setPage}
                 />
               )}
@@ -1780,165 +1612,6 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
 
 // ── Sub-components ─────────────────────────────────────────────────────
 
-function PriorityTable({
-  records,
-  onView,
-  onDone,
-  onIssue,
-  onTogglePriority,
-  priorityIds,
-}: {
-  records: SubmissionRecord[];
-  onView: (record: SubmissionRecord) => void;
-  onDone: (record: SubmissionRecord) => void;
-  onIssue: (record: SubmissionRecord) => void;
-  onTogglePriority: (id: number) => void;
-  priorityIds: Set<number>;
-}) {
-  return (
-    <table
-      style={{
-        width: "100%",
-        borderCollapse: "collapse",
-        fontSize: "0.875rem",
-      }}
-    >
-      <thead>
-        <tr
-          style={{
-            backgroundColor: "#fff7ed",
-            borderBottom: "1px solid #fde68a",
-          }}
-        >
-          {[
-            "APPLICANT",
-            "DATE",
-            "OFFICE CODE",
-            "ACCOUNT TYPE",
-            "MODULES",
-            "ACTIONS",
-          ].map((h) => (
-            <th
-              key={h}
-              style={{
-                textAlign: "left",
-                padding: "10px 20px",
-                fontSize: "0.7rem",
-                fontWeight: 600,
-                color: "#92400e",
-                letterSpacing: "0.05em",
-              }}
-            >
-              {h}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {records.map((req, i) => {
-          const userInfo = req.uaa_user_info[0];
-          const sysAccess = req.uaa_system_access[0];
-          const modules = req.uaa_modules[0];
-          const moduleList = modules?.selected_modules ?? [];
-          const fullName = userInfo
-            ? `${userInfo.last_name}, ${userInfo.first_name} ${userInfo.middle_name ?? ""}`.trim()
-            : "—";
-
-          return (
-            <tr
-              key={req.id}
-              style={{
-                borderBottom: "1px solid #fef3c7",
-                backgroundColor: i % 2 === 0 ? "#fff" : "#fffbeb",
-              }}
-            >
-              <td style={{ padding: "14px 20px" }}>
-                <div style={{ fontWeight: 600, color: "#111827" }}>
-                  {fullName}
-                </div>
-                <div
-                  style={{
-                    fontSize: "0.75rem",
-                    color: "#9ca3af",
-                    marginTop: 2,
-                  }}
-                >
-                  {userInfo?.designation ?? "—"} •{" "}
-                  {userInfo?.employee_id ?? "—"}
-                </div>
-              </td>
-              <td style={{ padding: "14px 20px", color: "#4b5563" }}>
-                {req.submitted_at
-                  ? new Date(req.submitted_at).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    })
-                  : "—"}
-              </td>
-              <td style={{ padding: "14px 20px", color: "#4b5563" }}>
-                {req.office_code ?? "—"}
-              </td>
-              <td style={{ padding: "14px 20px", color: "#4b5563" }}>
-                {sysAccess?.account_type ?? "—"}
-              </td>
-              <td style={{ padding: "14px 20px" }}>
-                {moduleList.length > 0 ? (
-                  <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>
-                    {moduleList.slice(0, 2).join(", ")}
-                    {moduleList.length > 2 && (
-                      <span style={{ color: "#3b82f6" }}>
-                        {" "}
-                        +{moduleList.length - 2} more
-                      </span>
-                    )}
-                  </span>
-                ) : (
-                  <span style={{ fontSize: "0.75rem", color: "#9ca3af" }}>
-                    —
-                  </span>
-                )}
-              </td>
-              <td style={{ padding: "14px 20px" }}>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <ActionBtn
-                    onClick={() => onView(req)}
-                    color="#6b7280"
-                    borderColor="#d1d5db"
-                    label="View"
-                  />
-                  <ActionBtn
-                    onClick={() => onDone(req)}
-                    color="#16a34a"
-                    borderColor="#4ade80"
-                    label="Mark Done"
-                  />
-                  <ActionBtn
-                    onClick={() => onIssue(req)}
-                    color="#ef4444"
-                    borderColor="#f87171"
-                    label="Flag Issue"
-                  />
-                  <ActionBtn
-                    onClick={() => onTogglePriority(req.id)}
-                    color={priorityIds.has(req.id) ? "#d97706" : "#6b7280"}
-                    borderColor={
-                      priorityIds.has(req.id) ? "#f59e0b" : "#d1d5db"
-                    }
-                    label={
-                      priorityIds.has(req.id) ? "★ Unpriority" : "☆ Priority"
-                    }
-                  />
-                </div>
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
-  );
-}
-
 function SearchBox({
   value,
   onChange,
@@ -2164,3 +1837,6 @@ function ActionBtn({
     </button>
   );
 }
+
+
+

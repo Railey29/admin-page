@@ -13,6 +13,7 @@ export interface SubmissionRecord {
   approved_by_l2: boolean | null;
   approved_by_l3: boolean | null;
   approved_by_l4: boolean | null;
+  isPriority: boolean;
   uaa_user_info: {
     last_name: string | null;
     first_name: string | null;
@@ -52,7 +53,7 @@ export function useSubmissions(level: number) {
       } else {
         setError(json.error);
       }
-    } catch (e) {
+    } catch {
       setError("Failed to fetch submissions.");
     } finally {
       setLoading(false);
@@ -82,6 +83,21 @@ export function useSubmissions(level: number) {
     });
     const json = await res.json();
     if (json.success) fetchSubmissions();
+    return json.success;
+  };
+
+  const togglePriority = async (id: number) => {
+    const submissionId = Number(id);
+    if (!Number.isFinite(submissionId) || submissionId <= 0) {
+      return false;
+    }
+    const res = await fetch(`/api/requests/${submissionId}/priority`, {
+      method: "PATCH",
+    });
+    const json = await res.json();
+    if (json.success) {
+      await fetchSubmissions();
+    }
     return json.success;
   };
 
@@ -116,6 +132,7 @@ export function useSubmissions(level: number) {
     error,
     approve,
     reject,
+    togglePriority,
     refresh: fetchSubmissions,
   };
 }
