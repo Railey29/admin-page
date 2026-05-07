@@ -99,6 +99,7 @@ async function sendStatusEmail(payload: EmailPayload) {
 
 export default function Level1to3Dashboard({ admin, onLogout }: Props) {
   const [tab, setTab] = useState<Tab>("dashboard");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [filter, setFilter] = useState<DateFilter>("thisWeek");
   const [viewModal, setViewModal] = useState<SubmissionRecord | null>(null);
 
@@ -350,7 +351,25 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
             {admin.displayName} — {admin.role}
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <button
+          type="button"
+          className="sm:hidden"
+          onClick={() => setMobileMenuOpen((open) => !open)}
+          aria-label="Toggle admin menu"
+          style={{
+            marginLeft: "auto",
+            border: "1px solid #fff",
+            color: "#fff",
+            background: "transparent",
+            fontSize: "0.8rem",
+            padding: "6px 16px",
+            borderRadius: 6,
+            cursor: "pointer",
+          }}
+        >
+          Menu
+        </button>
+        <div className="hidden items-center gap-4 sm:flex">
           <span style={{ fontSize: "0.85rem", color: "#dbeafe" }}>
             {admin.displayName}
           </span>
@@ -370,6 +389,28 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
           </button>
         </div>
       </header>
+      {mobileMenuOpen && (
+        <div className="border-b border-blue-900 bg-blue-950 px-4 py-3 text-white sm:hidden">
+          <div className="flex flex-col gap-2">
+            <span className="text-sm font-semibold">{admin.displayName}</span>
+            <span className="text-xs text-blue-200">{admin.role}</span>
+            <button
+              onClick={onLogout}
+              style={{
+                border: "1px solid #fff",
+                color: "#fff",
+                background: "transparent",
+                fontSize: "0.8rem",
+                padding: "6px 16px",
+                borderRadius: 6,
+                cursor: "pointer",
+              }}
+            >
+              Sign Out
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── TABS ── */}
       <div
@@ -380,6 +421,7 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
           display: "flex",
           gap: 8,
         }}
+        className="overflow-x-auto sm:overflow-visible"
       >
         {(["dashboard", "reports"] as Tab[]).map((t) => (
           <button
@@ -400,6 +442,8 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
               background: "transparent",
               cursor: "pointer",
               marginRight: 16,
+              whiteSpace: "nowrap",
+              flexShrink: 0,
             }}
           >
             {t === "dashboard" ? "📋 Dashboard" : "📊 Reports"}
@@ -407,7 +451,7 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
         ))}
       </div>
 
-      <main style={{ padding: "24px", maxWidth: 1100, margin: "0 auto" }}>
+      <main className="mx-auto max-w-[1100px] px-4 py-6 sm:px-6" style={{ maxWidth: 1100, margin: "0 auto" }}>
         {tab === "dashboard" && (
           <>
             <div
@@ -474,10 +518,10 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(4,1fr)",
                 gap: 16,
                 marginBottom: 24,
               }}
+              className="grid-cols-2 sm:grid-cols-4"
             >
               <StatCard
                 value={stats.total}
@@ -578,7 +622,178 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                   No pending requests match your search.
                 </div>
               ) : (
-                <table
+                <>
+                  <div className="space-y-3 p-4 sm:hidden">
+                    {pagedPending.map((req) => {
+                      const userInfo = req.uaa_user_info[0];
+                      const sysAccess = req.uaa_system_access[0];
+                      const fullName = userInfo
+                        ? `${userInfo.last_name}, ${userInfo.first_name} ${userInfo.middle_name ?? ""}`.trim()
+                        : "—";
+
+                      return (
+                        <div
+                          key={req.id}
+                          style={{
+                            backgroundColor: "#fff",
+                            borderRadius: 12,
+                            border: "1px solid #e5e7eb",
+                            padding: 16,
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              gap: 12,
+                              alignItems: "flex-start",
+                            }}
+                          >
+                            <div>
+                              <div
+                                style={{
+                                  fontWeight: 600,
+                                  color: "#111827",
+                                  fontSize: "0.95rem",
+                                }}
+                              >
+                                {fullName}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: "0.75rem",
+                                  color: "#9ca3af",
+                                  marginTop: 2,
+                                }}
+                              >
+                                {userInfo?.designation ?? "—"} •{" "}
+                                {userInfo?.employee_id ?? "—"}
+                              </div>
+                            </div>
+                            <span
+                              style={{
+                                fontSize: "0.7rem",
+                                backgroundColor: "#eff6ff",
+                                color: "#1d4ed8",
+                                border: "1px solid #bfdbfe",
+                                padding: "2px 10px",
+                                borderRadius: 999,
+                                fontWeight: 500,
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              Pending
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "1fr 1fr",
+                              gap: 12,
+                              marginTop: 14,
+                              fontSize: "0.85rem",
+                            }}
+                          >
+                            <div>
+                              <div
+                                style={{
+                                  fontSize: "0.65rem",
+                                  fontWeight: 600,
+                                  color: "#9ca3af",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                  marginBottom: 3,
+                                }}
+                              >
+                                Date
+                              </div>
+                              <div style={{ color: "#4b5563" }}>
+                                {req.submitted_at
+                                  ? new Date(req.submitted_at).toLocaleDateString(
+                                      "en-US",
+                                      {
+                                        month: "short",
+                                        day: "numeric",
+                                        year: "numeric",
+                                      },
+                                    )
+                                  : "—"}
+                              </div>
+                            </div>
+                            <div>
+                              <div
+                                style={{
+                                  fontSize: "0.65rem",
+                                  fontWeight: 600,
+                                  color: "#9ca3af",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                  marginBottom: 3,
+                                }}
+                              >
+                                Office Code
+                              </div>
+                              <div style={{ color: "#4b5563" }}>
+                                {req.office_code ?? "—"}
+                              </div>
+                            </div>
+                            <div style={{ gridColumn: "1 / -1" }}>
+                              <div
+                                style={{
+                                  fontSize: "0.65rem",
+                                  fontWeight: 600,
+                                  color: "#9ca3af",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                  marginBottom: 3,
+                                }}
+                              >
+                                Account Type
+                              </div>
+                              <div style={{ color: "#4b5563" }}>
+                                {sysAccess?.account_type ?? "—"}
+                              </div>
+                            </div>
+                          </div>
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                              gap: 8,
+                              marginTop: 14,
+                            }}
+                          >
+                            <ActionBtn
+                              onClick={() => setViewModal(req)}
+                              color="#6b7280"
+                              borderColor="#d1d5db"
+                              label="👁 View"
+                            />
+                            <ActionBtn
+                              onClick={() => openApproveModal(req)}
+                              color="#16a34a"
+                              borderColor="#4ade80"
+                              label="✅ Approve"
+                            />
+                            <ActionBtn
+                              onClick={() => openRejectModal(req)}
+                              color="#ef4444"
+                              borderColor="#f87171"
+                              label="❌ Reject"
+                            />
+                            <ActionBtn
+                              onClick={() => void handleTogglePriority(req.id)}
+                              color="#d97706"
+                              borderColor="#f59e0b"
+                              label={req.isPriority ? "★ Unpriority" : "☆ Priority"}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <table
+                    className="hidden sm:table"
                   style={{
                     width: "100%",
                     borderCollapse: "collapse",
@@ -706,7 +921,8 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                       );
                     })}
                   </tbody>
-                </table>
+                  </table>
+                </>
               )}
               {!loading && searchedPending.length > 0 && (
                 <Pagination
@@ -874,7 +1090,185 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                   No submissions match your search.
                 </div>
               ) : (
-                <table
+                <>
+                  <div className="space-y-3 p-4 sm:hidden">
+                    {pagedReports.map((req) => {
+                      const userInfo = req.uaa_user_info[0];
+                      const sysAccess = req.uaa_system_access[0];
+                      const fullName = userInfo
+                        ? `${userInfo.last_name}, ${userInfo.first_name}`.trim()
+                        : "—";
+                      const isRejected = req.status === "Rejected";
+                      const isProcessed = req.approved_by_l4;
+
+                      return (
+                        <div
+                          key={req.id}
+                          style={{
+                            backgroundColor: "#fff",
+                            borderRadius: 12,
+                            border: "1px solid #e5e7eb",
+                            padding: 16,
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              gap: 12,
+                              alignItems: "flex-start",
+                            }}
+                          >
+                            <div>
+                              <div
+                                style={{
+                                  fontSize: "0.65rem",
+                                  fontWeight: 600,
+                                  color: "#9ca3af",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                  marginBottom: 3,
+                                }}
+                              >
+                                Tracking ID
+                              </div>
+                              <div
+                                style={{
+                                  fontWeight: 600,
+                                  color: "#111827",
+                                  fontSize: "0.95rem",
+                                }}
+                              >
+                                {req.tracking_id}
+                              </div>
+                            </div>
+                            <span
+                              style={{
+                                fontSize: "0.7rem",
+                                fontWeight: 500,
+                                padding: "3px 10px",
+                                borderRadius: 999,
+                                backgroundColor: isRejected
+                                  ? "#fef2f2"
+                                  : isProcessed
+                                    ? "#f0fdf4"
+                                    : "#fff7ed",
+                                color: isRejected
+                                  ? "#ef4444"
+                                  : isProcessed
+                                    ? "#16a34a"
+                                    : "#f97316",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {isRejected
+                                ? "Rejected"
+                                : isProcessed
+                                  ? "Processed"
+                                  : "Pending"}
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "1fr 1fr",
+                              gap: 12,
+                              marginTop: 14,
+                              fontSize: "0.85rem",
+                            }}
+                          >
+                            <div style={{ gridColumn: "1 / -1" }}>
+                              <div
+                                style={{
+                                  fontSize: "0.65rem",
+                                  fontWeight: 600,
+                                  color: "#9ca3af",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                  marginBottom: 3,
+                                }}
+                              >
+                                Applicant
+                              </div>
+                              <div style={{ fontWeight: 600, color: "#111827" }}>
+                                {fullName}
+                              </div>
+                            </div>
+                            <div>
+                              <div
+                                style={{
+                                  fontSize: "0.65rem",
+                                  fontWeight: 600,
+                                  color: "#9ca3af",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                  marginBottom: 3,
+                                }}
+                              >
+                                Office
+                              </div>
+                              <div style={{ color: "#4b5563" }}>
+                                {req.office_code ?? "—"}
+                              </div>
+                            </div>
+                            <div>
+                              <div
+                                style={{
+                                  fontSize: "0.65rem",
+                                  fontWeight: 600,
+                                  color: "#9ca3af",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                  marginBottom: 3,
+                                }}
+                              >
+                                Account Type
+                              </div>
+                              <div style={{ color: "#4b5563" }}>
+                                {sysAccess?.account_type ?? "—"}
+                              </div>
+                            </div>
+                            <div style={{ gridColumn: "1 / -1" }}>
+                              <div
+                                style={{
+                                  fontSize: "0.65rem",
+                                  fontWeight: 600,
+                                  color: "#9ca3af",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                  marginBottom: 3,
+                                }}
+                              >
+                                Date Submitted
+                              </div>
+                              <div style={{ color: "#4b5563" }}>
+                                {req.submitted_at
+                                  ? new Date(req.submitted_at).toLocaleDateString(
+                                      "en-US",
+                                      {
+                                        month: "short",
+                                        day: "numeric",
+                                        year: "numeric",
+                                      },
+                                    )
+                                  : "—"}
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ marginTop: 14 }}>
+                            <ActionBtn
+                              onClick={() => void handleTogglePriority(req.id)}
+                              color={req.isPriority ? "#d97706" : "#6b7280"}
+                              borderColor={req.isPriority ? "#f59e0b" : "#d1d5db"}
+                              label={req.isPriority ? "★ Unpriority" : "☆ Priority"}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <table
+                    className="hidden sm:table"
                   style={{
                     width: "100%",
                     borderCollapse: "collapse",
@@ -1018,7 +1412,8 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                       );
                     })}
                   </tbody>
-                </table>
+                  </table>
+                </>
               )}
               {!loading && searchedReports.length > 0 && (
                 <Pagination
@@ -1378,6 +1773,7 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                     gap: 8,
                     flexShrink: 0,
                   }}
+                  className="flex-wrap sm:flex-nowrap"
                 >
                   {canActOnRecord(viewModal) && (
                     <>
@@ -1566,6 +1962,7 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                 justifyContent: "flex-end",
                 gap: 8,
               }}
+              className="flex-wrap sm:flex-nowrap"
             >
               <button
                 onClick={() => setApproveModal(null)}
@@ -1738,6 +2135,7 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                 justifyContent: "flex-end",
                 gap: 8,
               }}
+              className="flex-wrap sm:flex-nowrap"
             >
               <button
                 onClick={() => setRejectModal(null)}
@@ -1797,8 +2195,8 @@ function SearchBox({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder="Search name or office"
+      className="w-full sm:w-[220px]"
       style={{
-        width: 220,
         padding: "8px 12px",
         border: "1px solid #d1d5db",
         borderRadius: 8,
@@ -2030,6 +2428,7 @@ function ActionBtn({
   return (
     <button
       onClick={onClick}
+      className="w-full sm:w-auto"
       style={{
         display: "flex",
         alignItems: "center",
