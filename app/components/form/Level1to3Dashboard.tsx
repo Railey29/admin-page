@@ -84,7 +84,6 @@ function sortByFifoDate(records: SubmissionRecord[]) {
   });
 }
 
-// ── Same pattern as Level4Dashboard ──────────────────────────────────
 async function sendStatusEmail(payload: EmailPayload) {
   try {
     await fetch("/api/send-email", {
@@ -97,13 +96,56 @@ async function sendStatusEmail(payload: EmailPayload) {
   }
 }
 
+// ── Filter button style helper ────────────────────────────────────────
+function filterButtonStyle(
+  f: DateFilter,
+  activeFilter: DateFilter,
+): CSSProperties {
+  const isActive = activeFilter === f;
+  const isPriority = f === "priority";
+
+  let backgroundColor = "#fff";
+  let color = "#6b7280";
+  let borderColor = "#d1d5db";
+
+  if (isPriority) {
+    if (isActive) {
+      backgroundColor = "#f59e0b";
+      color = "#fff";
+      borderColor = "#f59e0b";
+    } else {
+      backgroundColor = "#fffbeb";
+      color = "#d97706";
+      borderColor = "#f59e0b";
+    }
+  } else {
+    if (isActive) {
+      backgroundColor = "#1e3a8a";
+      color = "#fff";
+      borderColor = "#1e3a8a";
+    }
+  }
+
+  return {
+    fontSize: "0.75rem",
+    padding: "6px 12px",
+    borderRadius: 6,
+    cursor: "pointer",
+    border: "1px solid",
+    transition: "all 0.15s",
+    backgroundColor,
+    color,
+    borderColor,
+    fontWeight: isPriority ? 600 : 400,
+  };
+}
+
 export default function Level1to3Dashboard({ admin, onLogout }: Props) {
   const [tab, setTab] = useState<Tab>("dashboard");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [filter, setFilter] = useState<DateFilter>("thisWeek");
   const [viewModal, setViewModal] = useState<SubmissionRecord | null>(null);
 
-  // ── Reject comment modal state (same as Level4) ───────────────────
   const [rejectModal, setRejectModal] = useState<SubmissionRecord | null>(null);
   const [rejectComment, setRejectComment] = useState("");
   const [approveModal, setApproveModal] = useState<SubmissionRecord | null>(
@@ -116,9 +158,7 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
   const [reportPage, setReportPage] = useState(1);
 
   const { submissions, stats, loading, approve, reject, togglePriority } =
-    useSubmissions(
-    admin.level,
-  );
+    useSubmissions(admin.level);
   const isPriorityFilterActive = filter === "priority";
 
   const pendingForMe = submissions.filter((s) => {
@@ -220,14 +260,12 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
     }
   };
 
-  // ── Opens the reject comment modal (same flow as Level4) ──────────
   const openRejectModal = (record: SubmissionRecord) => {
     setRejectComment("");
     setRejectModal(record);
     setViewModal(null);
   };
 
-  // ── Confirms rejection + sends email (mirrors Level4 handleConfirm) ─
   const handleConfirmReject = async () => {
     if (!rejectModal) return;
 
@@ -451,7 +489,10 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
         ))}
       </div>
 
-      <main className="mx-auto max-w-[1100px] px-4 py-6 sm:px-6" style={{ maxWidth: 1100, margin: "0 auto" }}>
+      <main
+        className="mx-auto max-w-[1100px] px-4 py-6 sm:px-6"
+        style={{ maxWidth: 1100, margin: "0 auto" }}
+      >
         {tab === "dashboard" && (
           <>
             <div
@@ -486,23 +527,14 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                   {dateFilters.map((f) => (
                     <button
                       key={f}
-                        onClick={() => {
-                          setFilter(f);
-                          setPendingPage(1);
-                          setReportPage(1);
-                        }}
-                      style={{
-                        fontSize: "0.75rem",
-                        padding: "6px 12px",
-                        borderRadius: 6,
-                        cursor: "pointer",
-                        border: "1px solid",
-                        transition: "all 0.15s",
-                        backgroundColor: filter === f ? "#1e3a8a" : "#fff",
-                        color: filter === f ? "#fff" : "#6b7280",
-                        borderColor: filter === f ? "#1e3a8a" : "#d1d5db",
+                      onClick={() => {
+                        setFilter(f);
+                        setPendingPage(1);
+                        setReportPage(1);
                       }}
+                      style={filterButtonStyle(f, filter)}
                     >
+                      {f === "priority" ? "★ " : ""}
                       {dateFilterLabels[f]}
                     </button>
                   ))}
@@ -709,14 +741,13 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                               </div>
                               <div style={{ color: "#4b5563" }}>
                                 {req.submitted_at
-                                  ? new Date(req.submitted_at).toLocaleDateString(
-                                      "en-US",
-                                      {
-                                        month: "short",
-                                        day: "numeric",
-                                        year: "numeric",
-                                      },
-                                    )
+                                  ? new Date(
+                                      req.submitted_at,
+                                    ).toLocaleDateString("en-US", {
+                                      month: "short",
+                                      day: "numeric",
+                                      year: "numeric",
+                                    })
                                   : "—"}
                               </div>
                             </div>
@@ -767,25 +798,31 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                               onClick={() => setViewModal(req)}
                               color="#6b7280"
                               borderColor="#d1d5db"
+                              bgColor="#fff"
                               label="👁 View"
                             />
                             <ActionBtn
                               onClick={() => openApproveModal(req)}
                               color="#16a34a"
                               borderColor="#4ade80"
+                              bgColor="#fff"
                               label="✅ Approve"
                             />
                             <ActionBtn
                               onClick={() => openRejectModal(req)}
                               color="#ef4444"
                               borderColor="#f87171"
+                              bgColor="#fff"
                               label="❌ Reject"
                             />
                             <ActionBtn
                               onClick={() => void handleTogglePriority(req.id)}
-                              color="#d97706"
+                              color={req.isPriority ? "#fff" : "#d97706"}
                               borderColor="#f59e0b"
-                              label={req.isPriority ? "★ Unpriority" : "☆ Priority"}
+                              bgColor={req.isPriority ? "#f59e0b" : "#fffbeb"}
+                              label={
+                                req.isPriority ? "★ Unpriority" : "☆ Priority"
+                              }
                             />
                           </div>
                         </div>
@@ -794,133 +831,142 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                   </div>
                   <table
                     className="hidden sm:table"
-                  style={{
-                    width: "100%",
-                    borderCollapse: "collapse",
-                    fontSize: "0.875rem",
-                  }}
-                >
-                  <thead>
-                    <tr
-                      style={{
-                        backgroundColor: "#f9fafb",
-                        borderBottom: "1px solid #f3f4f6",
-                      }}
-                    >
-                      {[
-                        "APPLICANT",
-                        "DATE SUBMITTED",
-                        "OFFICE CODE",
-                        "ACCOUNT TYPE",
-                        "ACTIONS",
-                      ].map((h) => (
-                        <th
-                          key={h}
-                          style={{
-                            textAlign: "left",
-                            padding: "10px 20px",
-                            fontSize: "0.7rem",
-                            fontWeight: 600,
-                            color: "#6b7280",
-                            letterSpacing: "0.05em",
-                          }}
-                        >
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pagedPending.map((req, i) => {
-                      const userInfo = req.uaa_user_info[0];
-                      const sysAccess = req.uaa_system_access[0];
-                      const fullName = userInfo
-                        ? `${userInfo.last_name}, ${userInfo.first_name} ${userInfo.middle_name ?? ""}`.trim()
-                        : "—";
-                      return (
-                        <tr
-                          key={req.id}
-                          style={{
-                            borderBottom: "1px solid #f9fafb",
-                            backgroundColor: i % 2 === 0 ? "#fff" : "#fafafa",
-                          }}
-                        >
-                          <td style={{ padding: "14px 20px" }}>
-                            <div style={{ fontWeight: 600, color: "#111827" }}>
-                              {fullName}
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "0.75rem",
-                                color: "#9ca3af",
-                                marginTop: 2,
-                              }}
+                    style={{
+                      width: "100%",
+                      borderCollapse: "collapse",
+                      fontSize: "0.875rem",
+                    }}
+                  >
+                    <thead>
+                      <tr
+                        style={{
+                          backgroundColor: "#f9fafb",
+                          borderBottom: "1px solid #f3f4f6",
+                        }}
+                      >
+                        {[
+                          "APPLICANT",
+                          "DATE SUBMITTED",
+                          "OFFICE CODE",
+                          "ACCOUNT TYPE",
+                          "ACTIONS",
+                        ].map((h) => (
+                          <th
+                            key={h}
+                            style={{
+                              textAlign: "left",
+                              padding: "10px 20px",
+                              fontSize: "0.7rem",
+                              fontWeight: 600,
+                              color: "#6b7280",
+                              letterSpacing: "0.05em",
+                            }}
+                          >
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pagedPending.map((req, i) => {
+                        const userInfo = req.uaa_user_info[0];
+                        const sysAccess = req.uaa_system_access[0];
+                        const fullName = userInfo
+                          ? `${userInfo.last_name}, ${userInfo.first_name} ${userInfo.middle_name ?? ""}`.trim()
+                          : "—";
+                        return (
+                          <tr
+                            key={req.id}
+                            style={{
+                              borderBottom: "1px solid #f9fafb",
+                              backgroundColor: i % 2 === 0 ? "#fff" : "#fafafa",
+                            }}
+                          >
+                            <td style={{ padding: "14px 20px" }}>
+                              <div
+                                style={{ fontWeight: 600, color: "#111827" }}
+                              >
+                                {fullName}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: "0.75rem",
+                                  color: "#9ca3af",
+                                  marginTop: 2,
+                                }}
+                              >
+                                {userInfo?.designation ?? "—"} •{" "}
+                                {userInfo?.employee_id ?? "—"}
+                              </div>
+                            </td>
+                            <td
+                              style={{ padding: "14px 20px", color: "#4b5563" }}
                             >
-                              {userInfo?.designation ?? "—"} •{" "}
-                              {userInfo?.employee_id ?? "—"}
-                            </div>
-                          </td>
-                          <td
-                            style={{ padding: "14px 20px", color: "#4b5563" }}
-                          >
-                            {req.submitted_at
-                              ? new Date(req.submitted_at).toLocaleDateString(
-                                  "en-US",
-                                  {
-                                    month: "short",
-                                    day: "numeric",
-                                    year: "numeric",
-                                  },
-                                )
-                              : "—"}
-                          </td>
-                          <td
-                            style={{ padding: "14px 20px", color: "#4b5563" }}
-                          >
-                            {req.office_code ?? "—"}
-                          </td>
-                          <td
-                            style={{ padding: "14px 20px", color: "#4b5563" }}
-                          >
-                            {sysAccess?.account_type ?? "—"}
-                          </td>
-                          <td style={{ padding: "14px 20px" }}>
-                            <div style={{ display: "flex", gap: 8 }}>
-                              <ActionBtn
-                                onClick={() => setViewModal(req)}
-                                color="#6b7280"
-                                borderColor="#d1d5db"
-                                label="👁 View"
-                              />
-                              <ActionBtn
-                                onClick={() => openApproveModal(req)}
-                                color="#16a34a"
-                                borderColor="#4ade80"
-                                label="✅ Approve"
-                              />
-                              {/* ── Reject now opens comment modal ── */}
-                              <ActionBtn
-                                onClick={() => openRejectModal(req)}
-                                color="#ef4444"
-                                borderColor="#f87171"
-                                label="❌ Reject"
-                              />
-                              <ActionBtn
-                                onClick={() => void handleTogglePriority(req.id)}
-                                color="#d97706"
-                                borderColor="#f59e0b"
-                                label={
-                                  req.isPriority
-                                    ? "★ Unpriority"
-                                    : "☆ Priority"
-                                }
-                              />
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
+                              {req.submitted_at
+                                ? new Date(req.submitted_at).toLocaleDateString(
+                                    "en-US",
+                                    {
+                                      month: "short",
+                                      day: "numeric",
+                                      year: "numeric",
+                                    },
+                                  )
+                                : "—"}
+                            </td>
+                            <td
+                              style={{ padding: "14px 20px", color: "#4b5563" }}
+                            >
+                              {req.office_code ?? "—"}
+                            </td>
+                            <td
+                              style={{ padding: "14px 20px", color: "#4b5563" }}
+                            >
+                              {sysAccess?.account_type ?? "—"}
+                            </td>
+                            <td style={{ padding: "14px 20px" }}>
+                              <div style={{ display: "flex", gap: 8 }}>
+                                <ActionBtn
+                                  onClick={() => setViewModal(req)}
+                                  color="#6b7280"
+                                  borderColor="#d1d5db"
+                                  bgColor="#fff"
+                                  label="👁 View"
+                                />
+                                <ActionBtn
+                                  onClick={() => openApproveModal(req)}
+                                  color="#16a34a"
+                                  borderColor="#4ade80"
+                                  bgColor="#fff"
+                                  label="✅ Approve"
+                                />
+                                <ActionBtn
+                                  onClick={() => openRejectModal(req)}
+                                  color="#ef4444"
+                                  borderColor="#f87171"
+                                  bgColor="#fff"
+                                  label="❌ Reject"
+                                />
+                                <ActionBtn
+                                  onClick={() =>
+                                    void handleTogglePriority(req.id)
+                                  }
+                                  color={req.isPriority ? "#fff" : "#d97706"}
+                                  borderColor="#f59e0b"
+                                  bgColor={
+                                    req.isPriority ? "#f59e0b" : "#fffbeb"
+                                  }
+                                  label={
+                                    req.isPriority
+                                      ? "★ Unpriority"
+                                      : "☆ Priority"
+                                  }
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
                   </table>
                 </>
               )}
@@ -1036,18 +1082,9 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                           setPendingPage(1);
                           setReportPage(1);
                         }}
-                        style={{
-                          fontSize: "0.75rem",
-                          padding: "6px 12px",
-                          borderRadius: 6,
-                          cursor: "pointer",
-                          border: "1px solid",
-                          transition: "all 0.15s",
-                          backgroundColor: filter === f ? "#1e3a8a" : "#fff",
-                          color: filter === f ? "#fff" : "#6b7280",
-                          borderColor: filter === f ? "#1e3a8a" : "#d1d5db",
-                        }}
+                        style={filterButtonStyle(f, filter)}
                       >
+                        {f === "priority" ? "★ " : ""}
                         {dateFilterLabels[f]}
                       </button>
                     ))}
@@ -1190,7 +1227,9 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                               >
                                 Applicant
                               </div>
-                              <div style={{ fontWeight: 600, color: "#111827" }}>
+                              <div
+                                style={{ fontWeight: 600, color: "#111827" }}
+                              >
                                 {fullName}
                               </div>
                             </div>
@@ -1243,14 +1282,13 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                               </div>
                               <div style={{ color: "#4b5563" }}>
                                 {req.submitted_at
-                                  ? new Date(req.submitted_at).toLocaleDateString(
-                                      "en-US",
-                                      {
-                                        month: "short",
-                                        day: "numeric",
-                                        year: "numeric",
-                                      },
-                                    )
+                                  ? new Date(
+                                      req.submitted_at,
+                                    ).toLocaleDateString("en-US", {
+                                      month: "short",
+                                      day: "numeric",
+                                      year: "numeric",
+                                    })
                                   : "—"}
                               </div>
                             </div>
@@ -1258,9 +1296,12 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                           <div style={{ marginTop: 14 }}>
                             <ActionBtn
                               onClick={() => void handleTogglePriority(req.id)}
-                              color={req.isPriority ? "#d97706" : "#6b7280"}
-                              borderColor={req.isPriority ? "#f59e0b" : "#d1d5db"}
-                              label={req.isPriority ? "★ Unpriority" : "☆ Priority"}
+                              color={req.isPriority ? "#fff" : "#d97706"}
+                              borderColor="#f59e0b"
+                              bgColor={req.isPriority ? "#f59e0b" : "#fffbeb"}
+                              label={
+                                req.isPriority ? "★ Unpriority" : "☆ Priority"
+                              }
                             />
                           </div>
                         </div>
@@ -1269,149 +1310,146 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                   </div>
                   <table
                     className="hidden sm:table"
-                  style={{
-                    width: "100%",
-                    borderCollapse: "collapse",
-                    fontSize: "0.875rem",
-                  }}
-                >
-                  <thead>
-                    <tr
-                      style={{
-                        backgroundColor: "#f9fafb",
-                        borderBottom: "1px solid #f3f4f6",
-                      }}
-                    >
-                      {[
-                        "TRACKING ID",
-                        "APPLICANT",
-                        "OFFICE CODE",
-                        "ACCOUNT TYPE",
-                        "DATE SUBMITTED",
-                        "STATUS",
-                        "ACTIONS",
-                      ].map((h) => (
-                        <th
-                          key={h}
-                          style={{
-                            textAlign: "left",
-                            padding: "10px 20px",
-                            fontSize: "0.7rem",
-                            fontWeight: 600,
-                            color: "#6b7280",
-                            letterSpacing: "0.05em",
-                          }}
-                        >
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pagedReports.map((req, i) => {
-                      const userInfo = req.uaa_user_info[0];
-                      const sysAccess = req.uaa_system_access[0];
-                      const fullName = userInfo
-                        ? `${userInfo.last_name}, ${userInfo.first_name}`.trim()
-                        : "—";
-                      const isRejected = req.status === "Rejected";
-                      const isProcessed = req.approved_by_l4;
-                      return (
-                        <tr
-                          key={req.id}
-                          style={{
-                            borderBottom: "1px solid #f9fafb",
-                            backgroundColor: i % 2 === 0 ? "#fff" : "#fafafa",
-                          }}
-                        >
-                          <td
+                    style={{
+                      width: "100%",
+                      borderCollapse: "collapse",
+                      fontSize: "0.875rem",
+                    }}
+                  >
+                    <thead>
+                      <tr
+                        style={{
+                          backgroundColor: "#f9fafb",
+                          borderBottom: "1px solid #f3f4f6",
+                        }}
+                      >
+                        {[
+                          "TRACKING ID",
+                          "APPLICANT",
+                          "OFFICE CODE",
+                          "ACCOUNT TYPE",
+                          "DATE SUBMITTED",
+                          "STATUS",
+                          "ACTIONS",
+                        ].map((h) => (
+                          <th
+                            key={h}
                             style={{
-                              padding: "12px 20px",
-                              color: "#6b7280",
-                              fontSize: "0.8rem",
-                            }}
-                          >
-                            {req.tracking_id}
-                          </td>
-                          <td
-                            style={{
-                              padding: "12px 20px",
+                              textAlign: "left",
+                              padding: "10px 20px",
+                              fontSize: "0.7rem",
                               fontWeight: 600,
-                              color: "#111827",
+                              color: "#6b7280",
+                              letterSpacing: "0.05em",
                             }}
                           >
-                            {fullName}
-                          </td>
-                          <td
-                            style={{ padding: "12px 20px", color: "#4b5563" }}
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pagedReports.map((req, i) => {
+                        const userInfo = req.uaa_user_info[0];
+                        const sysAccess = req.uaa_system_access[0];
+                        const fullName = userInfo
+                          ? `${userInfo.last_name}, ${userInfo.first_name}`.trim()
+                          : "—";
+                        const isRejected = req.status === "Rejected";
+                        const isProcessed = req.approved_by_l4;
+                        return (
+                          <tr
+                            key={req.id}
+                            style={{
+                              borderBottom: "1px solid #f9fafb",
+                              backgroundColor: i % 2 === 0 ? "#fff" : "#fafafa",
+                            }}
                           >
-                            {req.office_code ?? "—"}
-                          </td>
-                          <td
-                            style={{ padding: "12px 20px", color: "#4b5563" }}
-                          >
-                            {sysAccess?.account_type ?? "—"}
-                          </td>
-                          <td
-                            style={{ padding: "12px 20px", color: "#4b5563" }}
-                          >
-                            {req.submitted_at
-                              ? new Date(req.submitted_at).toLocaleDateString(
-                                  "en-US",
-                                  {
-                                    month: "short",
-                                    day: "numeric",
-                                    year: "numeric",
-                                  },
-                                )
-                              : "—"}
-                          </td>
-                          <td style={{ padding: "12px 20px" }}>
-                            <span
+                            <td
                               style={{
-                                fontSize: "0.75rem",
-                                fontWeight: 500,
-                                padding: "3px 10px",
-                                borderRadius: 999,
-                                backgroundColor: isRejected
-                                  ? "#fef2f2"
-                                  : isProcessed
-                                    ? "#f0fdf4"
-                                    : "#fff7ed",
-                                color: isRejected
-                                  ? "#ef4444"
-                                  : isProcessed
-                                    ? "#16a34a"
-                                    : "#f97316",
+                                padding: "12px 20px",
+                                color: "#6b7280",
+                                fontSize: "0.8rem",
                               }}
                             >
-                              {isRejected
-                                ? "❌ Rejected"
-                                : isProcessed
-                                  ? "✅ Processed"
-                                  : "⏳ Pending"}
-                            </span>
-                          </td>
-                          <td style={{ padding: "12px 20px" }}>
-                            <ActionBtn
-                              onClick={() => void handleTogglePriority(req.id)}
-                              color={
-                                req.isPriority ? "#d97706" : "#6b7280"
-                              }
-                              borderColor={
-                                req.isPriority ? "#f59e0b" : "#d1d5db"
-                              }
-                              label={
-                                req.isPriority
-                                  ? "★ Unpriority"
-                                  : "☆ Priority"
-                              }
-                            />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
+                              {req.tracking_id}
+                            </td>
+                            <td
+                              style={{
+                                padding: "12px 20px",
+                                fontWeight: 600,
+                                color: "#111827",
+                              }}
+                            >
+                              {fullName}
+                            </td>
+                            <td
+                              style={{ padding: "12px 20px", color: "#4b5563" }}
+                            >
+                              {req.office_code ?? "—"}
+                            </td>
+                            <td
+                              style={{ padding: "12px 20px", color: "#4b5563" }}
+                            >
+                              {sysAccess?.account_type ?? "—"}
+                            </td>
+                            <td
+                              style={{ padding: "12px 20px", color: "#4b5563" }}
+                            >
+                              {req.submitted_at
+                                ? new Date(req.submitted_at).toLocaleDateString(
+                                    "en-US",
+                                    {
+                                      month: "short",
+                                      day: "numeric",
+                                      year: "numeric",
+                                    },
+                                  )
+                                : "—"}
+                            </td>
+                            <td style={{ padding: "12px 20px" }}>
+                              <span
+                                style={{
+                                  fontSize: "0.75rem",
+                                  fontWeight: 500,
+                                  padding: "3px 10px",
+                                  borderRadius: 999,
+                                  backgroundColor: isRejected
+                                    ? "#fef2f2"
+                                    : isProcessed
+                                      ? "#f0fdf4"
+                                      : "#fff7ed",
+                                  color: isRejected
+                                    ? "#ef4444"
+                                    : isProcessed
+                                      ? "#16a34a"
+                                      : "#f97316",
+                                }}
+                              >
+                                {isRejected
+                                  ? "❌ Rejected"
+                                  : isProcessed
+                                    ? "✅ Processed"
+                                    : "⏳ Pending"}
+                              </span>
+                            </td>
+                            <td style={{ padding: "12px 20px" }}>
+                              <ActionBtn
+                                onClick={() =>
+                                  void handleTogglePriority(req.id)
+                                }
+                                color={req.isPriority ? "#fff" : "#d97706"}
+                                borderColor="#f59e0b"
+                                bgColor={req.isPriority ? "#f59e0b" : "#fffbeb"}
+                                label={
+                                  req.isPriority ? "★ Unpriority" : "☆ Priority"
+                                }
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
                   </table>
                 </>
               )}
@@ -1792,7 +1830,6 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                       >
                         ✓ Approve
                       </button>
-                      {/* ── Reject in modal also opens comment modal ── */}
                       <button
                         onClick={() => openRejectModal(viewModal)}
                         style={{
@@ -1848,6 +1885,9 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
           );
         })()}
 
+      {/* ══════════════════════════════════════════════════
+          APPROVE MODAL
+      ══════════════════════════════════════════════════ */}
       {approveModal && (
         <div
           style={{
@@ -2002,7 +2042,7 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
       )}
 
       {/* ══════════════════════════════════════════════════
-          REJECT COMMENT MODAL — same design as Level4
+          REJECT COMMENT MODAL
       ══════════════════════════════════════════════════ */}
       {rejectModal && (
         <div
@@ -2026,7 +2066,6 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
               maxWidth: 460,
             }}
           >
-            {/* Modal header */}
             <div
               style={{
                 padding: "16px 24px",
@@ -2043,7 +2082,6 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
             </div>
 
             <div style={{ padding: "20px 24px" }}>
-              {/* Applicant info card */}
               {(() => {
                 const userInfo = rejectModal.uaa_user_info[0];
                 const fullName = userInfo
@@ -2125,7 +2163,6 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
               </div>
             </div>
 
-            {/* Modal footer */}
             <div
               style={{
                 padding: "12px 24px",
@@ -2418,11 +2455,13 @@ function ActionBtn({
   onClick,
   color,
   borderColor,
+  bgColor = "#fff",
   label,
 }: {
   onClick: () => void;
   color: string;
   borderColor: string;
+  bgColor?: string;
   label: string;
 }) {
   return (
@@ -2438,13 +2477,12 @@ function ActionBtn({
         border: `1px solid ${borderColor}`,
         borderRadius: 8,
         color,
-        background: "#fff",
+        background: bgColor,
         cursor: "pointer",
+        fontWeight: bgColor !== "#fff" ? 600 : 400,
       }}
     >
       {label}
     </button>
   );
 }
-
-

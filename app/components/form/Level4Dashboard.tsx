@@ -19,7 +19,13 @@ type SubmissionWithApprovers = SubmissionRecord & {
   approved_by_l3_name?: string | null;
   approved_by_l4_name?: string | null;
 };
-type DateFilter = "today" | "thisWeek" | "thisMonth" | "thisYear" | "allTime" | "priority";
+type DateFilter =
+  | "today"
+  | "thisWeek"
+  | "thisMonth"
+  | "thisYear"
+  | "allTime"
+  | "priority";
 const PAGE_SIZE = 4;
 
 const dateFilterLabels: Record<DateFilter, string> = {
@@ -97,6 +103,50 @@ async function sendStatusEmail(payload: EmailPayload) {
   }
 }
 
+// ── Filter button style helper ────────────────────────────────────────
+function filterButtonStyle(
+  f: DateFilter,
+  activeFilter: DateFilter,
+): CSSProperties {
+  const isActive = activeFilter === f;
+  const isPriority = f === "priority";
+
+  let backgroundColor = "#fff";
+  let color = "#6b7280";
+  let borderColor = "#d1d5db";
+
+  if (isPriority) {
+    if (isActive) {
+      backgroundColor = "#f59e0b";
+      color = "#fff";
+      borderColor = "#f59e0b";
+    } else {
+      backgroundColor = "#fffbeb";
+      color = "#d97706";
+      borderColor = "#f59e0b";
+    }
+  } else {
+    if (isActive) {
+      backgroundColor = "#1e3a8a";
+      color = "#fff";
+      borderColor = "#1e3a8a";
+    }
+  }
+
+  return {
+    fontSize: "0.75rem",
+    padding: "6px 12px",
+    borderRadius: 6,
+    cursor: "pointer",
+    border: "1px solid",
+    transition: "all 0.15s",
+    backgroundColor,
+    color,
+    borderColor,
+    fontWeight: isPriority ? 600 : 400,
+  };
+}
+
 export default function Level4Dashboard({ admin, onLogout }: Props) {
   const [tab, setTab] = useState<Tab>("toProcess");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -112,7 +162,8 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
   const [page, setPage] = useState(1);
   const [reportPage, setReportPage] = useState(1);
 
-  const { submissions, loading, approve, reject, togglePriority } = useSubmissions(4);
+  const { submissions, loading, approve, reject, togglePriority } =
+    useSubmissions(4);
 
   const handleRegisterAccount = async (data: {
     ltoEmployeeNumber: string;
@@ -208,7 +259,9 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
       ? `${userInfo.last_name ?? ""}, ${userInfo.first_name ?? ""} ${userInfo.middle_name ?? ""}`.trim()
       : "";
   };
+
   const isPriorityFilterActive = dateFilter === "priority";
+
   const filteredList = sortByFifoDate(
     (tab === "toProcess" ? toProcess : tab === "done" ? done : issues).filter(
       (record) =>
@@ -217,6 +270,7 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
           : isWithinDateFilter(record.submitted_at, dateFilter),
     ),
   );
+
   const searchedCurrentList = filteredList.filter((record) => {
     const query = searchTerm.trim().toLowerCase();
     if (!query) return true;
@@ -225,6 +279,7 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
       (record.office_code ?? "").toLowerCase().includes(query)
     );
   });
+
   const reportList = sortByFifoDate(
     submissions.filter((record) =>
       isPriorityFilterActive
@@ -232,6 +287,7 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
         : isWithinDateFilter(record.submitted_at, dateFilter),
     ),
   );
+
   const searchedReports = reportList.filter((record) => {
     const query = searchTerm.trim().toLowerCase();
     if (!query) return true;
@@ -240,11 +296,16 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
       (record.office_code ?? "").toLowerCase().includes(query)
     );
   });
+
   const pagedReports = searchedReports.slice(
     (reportPage - 1) * PAGE_SIZE,
     reportPage * PAGE_SIZE,
   );
-  const pageCount = Math.max(1, Math.ceil(searchedCurrentList.length / PAGE_SIZE));
+
+  const pageCount = Math.max(
+    1,
+    Math.ceil(searchedCurrentList.length / PAGE_SIZE),
+  );
   const pagedList = searchedCurrentList.slice(
     (page - 1) * PAGE_SIZE,
     page * PAGE_SIZE,
@@ -405,7 +466,10 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
         ))}
       </div>
 
-      <main className="mx-auto max-w-[1100px] px-4 py-6 sm:px-6" style={{ maxWidth: 1100, margin: "0 auto" }}>
+      <main
+        className="mx-auto max-w-[1100px] px-4 py-6 sm:px-6"
+        style={{ maxWidth: 1100, margin: "0 auto" }}
+      >
         {tab === "register" ? (
           <RegisterPage
             variant="embedded"
@@ -416,11 +480,7 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
           <>
             {/* ── STAT CARDS ── */}
             <div
-              style={{
-                display: "grid",
-                gap: 16,
-                marginBottom: 24,
-              }}
+              style={{ display: "grid", gap: 16, marginBottom: 24 }}
               className="grid-cols-1 sm:grid-cols-3"
             >
               <StatCard
@@ -499,24 +559,17 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                         setPage(1);
                         setReportPage(1);
                       }}
-                      style={{
-                        fontSize: "0.75rem",
-                        padding: "6px 12px",
-                        borderRadius: 6,
-                        cursor: "pointer",
-                        border: "1px solid",
-                        transition: "all 0.15s",
-                        backgroundColor: dateFilter === f ? "#1e3a8a" : "#fff",
-                        color: dateFilter === f ? "#fff" : "#6b7280",
-                        borderColor: dateFilter === f ? "#1e3a8a" : "#d1d5db",
-                      }}
+                      style={filterButtonStyle(f, dateFilter)}
                     >
+                      {f === "priority" ? "★ " : ""}
                       {dateFilterLabels[f]}
                     </button>
                   ))}
                 </div>
                 <ExportButtons
-                  records={tab === "reports" ? searchedReports : searchedCurrentList}
+                  records={
+                    tab === "reports" ? searchedReports : searchedCurrentList
+                  }
                   filename={
                     tab === "reports"
                       ? `l4-reports-${dateFilter}`
@@ -609,10 +662,25 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                                 }}
                               >
                                 <div>
-                                  <div style={{ fontSize: "0.65rem", fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>
+                                  <div
+                                    style={{
+                                      fontSize: "0.65rem",
+                                      fontWeight: 600,
+                                      color: "#9ca3af",
+                                      textTransform: "uppercase",
+                                      letterSpacing: "0.05em",
+                                      marginBottom: 3,
+                                    }}
+                                  >
                                     Tracking ID
                                   </div>
-                                  <div style={{ fontWeight: 600, color: "#111827", fontSize: "0.95rem" }}>
+                                  <div
+                                    style={{
+                                      fontWeight: 600,
+                                      color: "#111827",
+                                      fontSize: "0.95rem",
+                                    }}
+                                  >
                                     {req.tracking_id}
                                   </div>
                                 </div>
@@ -652,15 +720,38 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                                 }}
                               >
                                 <div style={{ gridColumn: "1 / -1" }}>
-                                  <div style={{ fontSize: "0.65rem", fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>
+                                  <div
+                                    style={{
+                                      fontSize: "0.65rem",
+                                      fontWeight: 600,
+                                      color: "#9ca3af",
+                                      textTransform: "uppercase",
+                                      letterSpacing: "0.05em",
+                                      marginBottom: 3,
+                                    }}
+                                  >
                                     Applicant
                                   </div>
-                                  <div style={{ fontWeight: 600, color: "#111827" }}>
+                                  <div
+                                    style={{
+                                      fontWeight: 600,
+                                      color: "#111827",
+                                    }}
+                                  >
                                     {fullName}
                                   </div>
                                 </div>
                                 <div>
-                                  <div style={{ fontSize: "0.65rem", fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>
+                                  <div
+                                    style={{
+                                      fontSize: "0.65rem",
+                                      fontWeight: 600,
+                                      color: "#9ca3af",
+                                      textTransform: "uppercase",
+                                      letterSpacing: "0.05em",
+                                      marginBottom: 3,
+                                    }}
+                                  >
                                     Office
                                   </div>
                                   <div style={{ color: "#4b5563" }}>
@@ -668,7 +759,16 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                                   </div>
                                 </div>
                                 <div>
-                                  <div style={{ fontSize: "0.65rem", fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>
+                                  <div
+                                    style={{
+                                      fontSize: "0.65rem",
+                                      fontWeight: 600,
+                                      color: "#9ca3af",
+                                      textTransform: "uppercase",
+                                      letterSpacing: "0.05em",
+                                      marginBottom: 3,
+                                    }}
+                                  >
                                     Account Type
                                   </div>
                                   <div style={{ color: "#4b5563" }}>
@@ -676,12 +776,23 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                                   </div>
                                 </div>
                                 <div style={{ gridColumn: "1 / -1" }}>
-                                  <div style={{ fontSize: "0.65rem", fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>
+                                  <div
+                                    style={{
+                                      fontSize: "0.65rem",
+                                      fontWeight: 600,
+                                      color: "#9ca3af",
+                                      textTransform: "uppercase",
+                                      letterSpacing: "0.05em",
+                                      marginBottom: 3,
+                                    }}
+                                  >
                                     Date
                                   </div>
                                   <div style={{ color: "#4b5563" }}>
                                     {req.submitted_at
-                                      ? new Date(req.submitted_at).toLocaleDateString("en-US", {
+                                      ? new Date(
+                                          req.submitted_at,
+                                        ).toLocaleDateString("en-US", {
                                           month: "short",
                                           day: "numeric",
                                           year: "numeric",
@@ -692,10 +803,19 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                               </div>
                               <div style={{ marginTop: 14 }}>
                                 <ActionBtn
-                                  onClick={() => void handleTogglePriority(req.id)}
-                                  color={req.isPriority ? "#d97706" : "#6b7280"}
-                                  borderColor={req.isPriority ? "#f59e0b" : "#d1d5db"}
-                                  label={req.isPriority ? "★ Unpriority" : "☆ Priority"}
+                                  onClick={() =>
+                                    void handleTogglePriority(req.id)
+                                  }
+                                  color={req.isPriority ? "#fff" : "#d97706"}
+                                  borderColor="#f59e0b"
+                                  bgColor={
+                                    req.isPriority ? "#f59e0b" : "#fffbeb"
+                                  }
+                                  label={
+                                    req.isPriority
+                                      ? "★ Unpriority"
+                                      : "☆ Priority"
+                                  }
                                 />
                               </div>
                             </div>
@@ -704,163 +824,160 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                       </div>
                       <table
                         className="hidden sm:table"
-                      style={{
-                        width: "100%",
-                        borderCollapse: "collapse",
-                        fontSize: "0.875rem",
-                      }}
-                    >
-                      <thead>
-                        <tr
-                          style={{
-                            backgroundColor: "#f9fafb",
-                            borderBottom: "1px solid #f3f4f6",
-                          }}
-                        >
-                          {[
-                            "TRACKING ID",
-                            "APPLICANT",
-                            "OFFICE CODE",
-                            "ACCOUNT TYPE",
-                            "DATE",
-                            "STATUS",
-                            "ACTIONS",
-                          ].map((h) => (
-                            <th
-                              key={h}
-                              style={{
-                                textAlign: "left",
-                                padding: "10px 20px",
-                                fontSize: "0.7rem",
-                                fontWeight: 600,
-                                color: "#6b7280",
-                                letterSpacing: "0.05em",
-                              }}
-                            >
-                              {h}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {pagedReports.map((req, i) => {
-                          const userInfo = req.uaa_user_info[0];
-                          const sysAccess = req.uaa_system_access[0];
-                          const fullName = userInfo
-                            ? `${userInfo.last_name}, ${userInfo.first_name} ${userInfo.middle_name ?? ""}`.trim()
-                            : "—";
-                          const isRejected = req.status === "Rejected";
-                          const isProcessed = req.approved_by_l4;
-                          return (
-                            <tr
-                              key={req.id}
-                              style={{
-                                borderBottom: "1px solid #f9fafb",
-                                backgroundColor:
-                                  i % 2 === 0 ? "#fff" : "#fafafa",
-                              }}
-                            >
-                              <td
+                        style={{
+                          width: "100%",
+                          borderCollapse: "collapse",
+                          fontSize: "0.875rem",
+                        }}
+                      >
+                        <thead>
+                          <tr
+                            style={{
+                              backgroundColor: "#f9fafb",
+                              borderBottom: "1px solid #f3f4f6",
+                            }}
+                          >
+                            {[
+                              "TRACKING ID",
+                              "APPLICANT",
+                              "OFFICE CODE",
+                              "ACCOUNT TYPE",
+                              "DATE",
+                              "STATUS",
+                              "ACTIONS",
+                            ].map((h) => (
+                              <th
+                                key={h}
                                 style={{
-                                  padding: "12px 20px",
-                                  color: "#6b7280",
-                                  fontSize: "0.8rem",
-                                }}
-                              >
-                                {req.tracking_id}
-                              </td>
-                              <td
-                                style={{
-                                  padding: "12px 20px",
+                                  textAlign: "left",
+                                  padding: "10px 20px",
+                                  fontSize: "0.7rem",
                                   fontWeight: 600,
-                                  color: "#111827",
+                                  color: "#6b7280",
+                                  letterSpacing: "0.05em",
                                 }}
                               >
-                                {fullName}
-                              </td>
-                              <td
+                                {h}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {pagedReports.map((req, i) => {
+                            const userInfo = req.uaa_user_info[0];
+                            const sysAccess = req.uaa_system_access[0];
+                            const fullName = userInfo
+                              ? `${userInfo.last_name}, ${userInfo.first_name} ${userInfo.middle_name ?? ""}`.trim()
+                              : "—";
+                            const isRejected = req.status === "Rejected";
+                            const isProcessed = req.approved_by_l4;
+                            return (
+                              <tr
+                                key={req.id}
                                 style={{
-                                  padding: "12px 20px",
-                                  color: "#4b5563",
+                                  borderBottom: "1px solid #f9fafb",
+                                  backgroundColor:
+                                    i % 2 === 0 ? "#fff" : "#fafafa",
                                 }}
                               >
-                                {req.office_code ?? "—"}
-                              </td>
-                              <td
-                                style={{
-                                  padding: "12px 20px",
-                                  color: "#4b5563",
-                                }}
-                              >
-                                {sysAccess?.account_type ?? "—"}
-                              </td>
-                              <td
-                                style={{
-                                  padding: "12px 20px",
-                                  color: "#4b5563",
-                                }}
-                              >
-                                {req.submitted_at
-                                  ? new Date(
-                                      req.submitted_at,
-                                    ).toLocaleDateString("en-US", {
-                                      month: "short",
-                                      day: "numeric",
-                                      year: "numeric",
-                                    })
-                                  : "—"}
-                              </td>
-                              <td style={{ padding: "12px 20px" }}>
-                                <span
+                                <td
                                   style={{
-                                    fontSize: "0.75rem",
-                                    fontWeight: 500,
-                                    padding: "3px 10px",
-                                    borderRadius: 999,
-                                    backgroundColor: isRejected
-                                      ? "#fef2f2"
-                                      : isProcessed
-                                        ? "#f0fdf4"
-                                        : "#fff7ed",
-                                    color: isRejected
-                                      ? "#ef4444"
-                                      : isProcessed
-                                        ? "#16a34a"
-                                        : "#f97316",
+                                    padding: "12px 20px",
+                                    color: "#6b7280",
+                                    fontSize: "0.8rem",
                                   }}
                                 >
-                                  {isRejected
-                                    ? "❌ Rejected"
-                                    : isProcessed
-                                      ? "✅ Processed"
-                                      : "⏳ Pending"}
-                                </span>
-                              </td>
-                              <td style={{ padding: "14px 20px" }}>
-                                <ActionBtn
-                                  onClick={() => void handleTogglePriority(req.id)}
-                                  color={
-                                    req.isPriority
-                                      ? "#d97706"
-                                      : "#6b7280"
-                                  }
-                                  borderColor={
-                                    req.isPriority
-                                      ? "#f59e0b"
-                                      : "#d1d5db"
-                                  }
-                                  label={
-                                    req.isPriority
-                                      ? "★ Unpriority"
-                                      : "☆ Priority"
-                                  }
-                                />
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                                  {req.tracking_id}
+                                </td>
+                                <td
+                                  style={{
+                                    padding: "12px 20px",
+                                    fontWeight: 600,
+                                    color: "#111827",
+                                  }}
+                                >
+                                  {fullName}
+                                </td>
+                                <td
+                                  style={{
+                                    padding: "12px 20px",
+                                    color: "#4b5563",
+                                  }}
+                                >
+                                  {req.office_code ?? "—"}
+                                </td>
+                                <td
+                                  style={{
+                                    padding: "12px 20px",
+                                    color: "#4b5563",
+                                  }}
+                                >
+                                  {sysAccess?.account_type ?? "—"}
+                                </td>
+                                <td
+                                  style={{
+                                    padding: "12px 20px",
+                                    color: "#4b5563",
+                                  }}
+                                >
+                                  {req.submitted_at
+                                    ? new Date(
+                                        req.submitted_at,
+                                      ).toLocaleDateString("en-US", {
+                                        month: "short",
+                                        day: "numeric",
+                                        year: "numeric",
+                                      })
+                                    : "—"}
+                                </td>
+                                <td style={{ padding: "12px 20px" }}>
+                                  <span
+                                    style={{
+                                      fontSize: "0.75rem",
+                                      fontWeight: 500,
+                                      padding: "3px 10px",
+                                      borderRadius: 999,
+                                      backgroundColor: isRejected
+                                        ? "#fef2f2"
+                                        : isProcessed
+                                          ? "#f0fdf4"
+                                          : "#fff7ed",
+                                      color: isRejected
+                                        ? "#ef4444"
+                                        : isProcessed
+                                          ? "#16a34a"
+                                          : "#f97316",
+                                    }}
+                                  >
+                                    {isRejected
+                                      ? "❌ Rejected"
+                                      : isProcessed
+                                        ? "✅ Processed"
+                                        : "⏳ Pending"}
+                                  </span>
+                                </td>
+                                <td style={{ padding: "14px 20px" }}>
+                                  <ActionBtn
+                                    onClick={() =>
+                                      void handleTogglePriority(req.id)
+                                    }
+                                    color={req.isPriority ? "#fff" : "#d97706"}
+                                    borderColor="#f59e0b"
+                                    bgColor={
+                                      req.isPriority ? "#f59e0b" : "#fffbeb"
+                                    }
+                                    label={
+                                      req.isPriority
+                                        ? "★ Unpriority"
+                                        : "☆ Priority"
+                                    }
+                                  />
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
                     </>
                   )}
                 </div>
@@ -967,12 +1084,23 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                             }}
                           >
                             <div>
-                              <div style={{ fontSize: "0.65rem", fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>
+                              <div
+                                style={{
+                                  fontSize: "0.65rem",
+                                  fontWeight: 600,
+                                  color: "#9ca3af",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                  marginBottom: 3,
+                                }}
+                              >
                                 Date
                               </div>
                               <div style={{ color: "#4b5563" }}>
                                 {req.submitted_at
-                                  ? new Date(req.submitted_at).toLocaleDateString("en-US", {
+                                  ? new Date(
+                                      req.submitted_at,
+                                    ).toLocaleDateString("en-US", {
                                       month: "short",
                                       day: "numeric",
                                       year: "numeric",
@@ -981,7 +1109,16 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                               </div>
                             </div>
                             <div>
-                              <div style={{ fontSize: "0.65rem", fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>
+                              <div
+                                style={{
+                                  fontSize: "0.65rem",
+                                  fontWeight: 600,
+                                  color: "#9ca3af",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                  marginBottom: 3,
+                                }}
+                              >
                                 Office Code
                               </div>
                               <div style={{ color: "#4b5563" }}>
@@ -989,7 +1126,16 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                               </div>
                             </div>
                             <div>
-                              <div style={{ fontSize: "0.65rem", fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>
+                              <div
+                                style={{
+                                  fontSize: "0.65rem",
+                                  fontWeight: 600,
+                                  color: "#9ca3af",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                  marginBottom: 3,
+                                }}
+                              >
                                 Account Type
                               </div>
                               <div style={{ color: "#4b5563" }}>
@@ -997,23 +1143,45 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                               </div>
                             </div>
                             <div style={{ gridColumn: "1 / -1" }}>
-                              <div style={{ fontSize: "0.65rem", fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>
+                              <div
+                                style={{
+                                  fontSize: "0.65rem",
+                                  fontWeight: 600,
+                                  color: "#9ca3af",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                  marginBottom: 3,
+                                }}
+                              >
                                 Modules
                               </div>
                               <div style={{ color: "#4b5563" }}>
-                                {moduleList.length > 0 ? moduleList.slice(0, 2).join(", ") : "—"}
+                                {moduleList.length > 0
+                                  ? moduleList.slice(0, 2).join(", ")
+                                  : "—"}
                                 {moduleList.length > 2 ? (
-                                  <span style={{ color: "#3b82f6" }}> +{moduleList.length - 2} more</span>
+                                  <span style={{ color: "#3b82f6" }}>
+                                    {" "}
+                                    +{moduleList.length - 2} more
+                                  </span>
                                 ) : null}
                               </div>
                             </div>
                           </div>
 
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8, marginTop: 14 }}>
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                              gap: 8,
+                              marginTop: 14,
+                            }}
+                          >
                             <ActionBtn
                               onClick={() => setViewModal(req)}
                               color="#6b7280"
                               borderColor="#d1d5db"
+                              bgColor="#fff"
                               label="👁 View"
                             />
                             {tab === "toProcess" && (
@@ -1022,29 +1190,62 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                                   onClick={() => openCommentModal(req, "done")}
                                   color="#16a34a"
                                   borderColor="#4ade80"
+                                  bgColor="#fff"
                                   label="✅ Mark Done"
                                 />
                                 <ActionBtn
                                   onClick={() => openCommentModal(req, "issue")}
                                   color="#ef4444"
                                   borderColor="#f87171"
+                                  bgColor="#fff"
                                   label="❌ Flag Issue"
                                 />
                                 <ActionBtn
-                                  onClick={() => void handleTogglePriority(req.id)}
-                                  color="#d97706"
+                                  onClick={() =>
+                                    void handleTogglePriority(req.id)
+                                  }
+                                  color={req.isPriority ? "#fff" : "#d97706"}
                                   borderColor="#f59e0b"
-                                  label={req.isPriority ? "★ Unpriority" : "☆ Priority"}
+                                  bgColor={
+                                    req.isPriority ? "#f59e0b" : "#fffbeb"
+                                  }
+                                  label={
+                                    req.isPriority
+                                      ? "★ Unpriority"
+                                      : "☆ Priority"
+                                  }
                                 />
                               </>
                             )}
                             {tab === "done" && (
-                              <span style={{ gridColumn: "1 / -1", fontSize: "0.75rem", color: "#16a34a", fontWeight: 500, backgroundColor: "#f0fdf4", padding: "4px 10px", borderRadius: 8, textAlign: "center" }}>
+                              <span
+                                style={{
+                                  gridColumn: "1 / -1",
+                                  fontSize: "0.75rem",
+                                  color: "#16a34a",
+                                  fontWeight: 500,
+                                  backgroundColor: "#f0fdf4",
+                                  padding: "4px 10px",
+                                  borderRadius: 8,
+                                  textAlign: "center",
+                                }}
+                              >
                                 ✅ Processed
                               </span>
                             )}
                             {tab === "issues" && (
-                              <span style={{ gridColumn: "1 / -1", fontSize: "0.75rem", color: "#ef4444", fontWeight: 500, backgroundColor: "#fef2f2", padding: "4px 10px", borderRadius: 8, textAlign: "center" }}>
+                              <span
+                                style={{
+                                  gridColumn: "1 / -1",
+                                  fontSize: "0.75rem",
+                                  color: "#ef4444",
+                                  fontWeight: 500,
+                                  backgroundColor: "#fef2f2",
+                                  padding: "4px 10px",
+                                  borderRadius: 8,
+                                  textAlign: "center",
+                                }}
+                              >
                                 ❌ Rejected
                               </span>
                             )}
@@ -1055,206 +1256,218 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                   </div>
                   <table
                     className="hidden sm:table"
-                  style={{
-                    width: "100%",
-                    borderCollapse: "collapse",
-                    fontSize: "0.875rem",
-                  }}
-                >
-                  <thead>
-                    <tr
-                      style={{
-                        backgroundColor: "#f9fafb",
-                        borderBottom: "1px solid #f3f4f6",
-                      }}
-                    >
-                      {[
-                        "APPLICANT",
-                        tab === "toProcess" ? "DATE APPROVED" : "DATE",
-                        "OFFICE CODE",
-                        "ACCOUNT TYPE",
-                        "MODULES",
-                        "ACTIONS",
-                      ].map((h) => (
-                        <th
-                          key={h}
-                          style={{
-                            textAlign: "left",
-                            padding: "10px 20px",
-                            fontSize: "0.7rem",
-                            fontWeight: 600,
-                            color: "#6b7280",
-                            letterSpacing: "0.05em",
-                          }}
-                        >
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pagedList.map((req, i) => {
-                      const userInfo = req.uaa_user_info[0];
-                      const sysAccess = req.uaa_system_access[0];
-                      const modules = req.uaa_modules[0];
-                      const fullName = userInfo
-                        ? `${userInfo.last_name}, ${userInfo.first_name} ${userInfo.middle_name ?? ""}`.trim()
-                        : "—";
-                      const moduleList = modules?.selected_modules ?? [];
+                    style={{
+                      width: "100%",
+                      borderCollapse: "collapse",
+                      fontSize: "0.875rem",
+                    }}
+                  >
+                    <thead>
+                      <tr
+                        style={{
+                          backgroundColor: "#f9fafb",
+                          borderBottom: "1px solid #f3f4f6",
+                        }}
+                      >
+                        {[
+                          "APPLICANT",
+                          tab === "toProcess" ? "DATE APPROVED" : "DATE",
+                          "OFFICE CODE",
+                          "ACCOUNT TYPE",
+                          "MODULES",
+                          "ACTIONS",
+                        ].map((h) => (
+                          <th
+                            key={h}
+                            style={{
+                              textAlign: "left",
+                              padding: "10px 20px",
+                              fontSize: "0.7rem",
+                              fontWeight: 600,
+                              color: "#6b7280",
+                              letterSpacing: "0.05em",
+                            }}
+                          >
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pagedList.map((req, i) => {
+                        const userInfo = req.uaa_user_info[0];
+                        const sysAccess = req.uaa_system_access[0];
+                        const modules = req.uaa_modules[0];
+                        const fullName = userInfo
+                          ? `${userInfo.last_name}, ${userInfo.first_name} ${userInfo.middle_name ?? ""}`.trim()
+                          : "—";
+                        const moduleList = modules?.selected_modules ?? [];
 
-                      return (
-                        <tr
-                          key={req.id}
-                          style={{
-                            borderBottom: "1px solid #f9fafb",
-                            backgroundColor: i % 2 === 0 ? "#fff" : "#fafafa",
-                          }}
-                        >
-                          <td style={{ padding: "14px 20px" }}>
-                            <div style={{ fontWeight: 600, color: "#111827" }}>
-                              {fullName}
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "0.75rem",
-                                color: "#9ca3af",
-                                marginTop: 2,
-                              }}
-                            >
-                              {userInfo?.designation ?? "—"} •{" "}
-                              {userInfo?.employee_id ?? "—"}
-                            </div>
-                          </td>
-                          <td
-                            style={{ padding: "14px 20px", color: "#4b5563" }}
+                        return (
+                          <tr
+                            key={req.id}
+                            style={{
+                              borderBottom: "1px solid #f9fafb",
+                              backgroundColor: i % 2 === 0 ? "#fff" : "#fafafa",
+                            }}
                           >
-                            {req.submitted_at
-                              ? new Date(req.submitted_at).toLocaleDateString(
-                                  "en-US",
-                                  {
-                                    month: "short",
-                                    day: "numeric",
-                                    year: "numeric",
-                                  },
-                                )
-                              : "—"}
-                          </td>
-                          <td
-                            style={{ padding: "14px 20px", color: "#4b5563" }}
-                          >
-                            {req.office_code ?? "—"}
-                          </td>
-                          <td
-                            style={{ padding: "14px 20px", color: "#4b5563" }}
-                          >
-                            {sysAccess?.account_type ?? "—"}
-                          </td>
-                          <td style={{ padding: "14px 20px" }}>
-                            {moduleList.length > 0 ? (
-                              <span
-                                style={{
-                                  fontSize: "0.75rem",
-                                  color: "#6b7280",
-                                }}
+                            <td style={{ padding: "14px 20px" }}>
+                              <div
+                                style={{ fontWeight: 600, color: "#111827" }}
                               >
-                                {moduleList.slice(0, 2).join(", ")}
-                                {moduleList.length > 2 && (
-                                  <span style={{ color: "#3b82f6" }}>
-                                    {" "}
-                                    +{moduleList.length - 2} more
-                                  </span>
-                                )}
-                              </span>
-                            ) : (
-                              <span
+                                {fullName}
+                              </div>
+                              <div
                                 style={{
                                   fontSize: "0.75rem",
                                   color: "#9ca3af",
+                                  marginTop: 2,
                                 }}
                               >
-                                —
-                              </span>
-                            )}
-                          </td>
-                          <td style={{ padding: "14px 20px" }}>
-                            <div
-                              style={{
-                                display: "flex",
-                                gap: 8,
-                                flexWrap: "wrap",
-                              }}
+                                {userInfo?.designation ?? "—"} •{" "}
+                                {userInfo?.employee_id ?? "—"}
+                              </div>
+                            </td>
+                            <td
+                              style={{ padding: "14px 20px", color: "#4b5563" }}
                             >
-                              <ActionBtn
-                                onClick={() => setViewModal(req)}
-                                color="#6b7280"
-                                borderColor="#d1d5db"
-                                label="👁 View"
-                              />
-                              {tab === "toProcess" && (
-                                <>
-                                  <ActionBtn
-                                    onClick={() =>
-                                      openCommentModal(req, "done")
-                                    }
-                                    color="#16a34a"
-                                    borderColor="#4ade80"
-                                    label="✅ Mark Done"
-                                  />
-                                  <ActionBtn
-                                    onClick={() =>
-                                      openCommentModal(req, "issue")
-                                    }
-                                    color="#ef4444"
-                                    borderColor="#f87171"
-                                    label="❌ Flag Issue"
-                                  />
-                                  <ActionBtn
-                                    onClick={() => void handleTogglePriority(req.id)}
-                                    color="#d97706"
-                                    borderColor="#f59e0b"
-                                    label={
-                                      req.isPriority
-                                        ? "★ Unpriority"
-                                        : "☆ Priority"
-                                    }
-                                  />
-                                </>
-                              )}
-                              {tab === "done" && (
+                              {req.submitted_at
+                                ? new Date(req.submitted_at).toLocaleDateString(
+                                    "en-US",
+                                    {
+                                      month: "short",
+                                      day: "numeric",
+                                      year: "numeric",
+                                    },
+                                  )
+                                : "—"}
+                            </td>
+                            <td
+                              style={{ padding: "14px 20px", color: "#4b5563" }}
+                            >
+                              {req.office_code ?? "—"}
+                            </td>
+                            <td
+                              style={{ padding: "14px 20px", color: "#4b5563" }}
+                            >
+                              {sysAccess?.account_type ?? "—"}
+                            </td>
+                            <td style={{ padding: "14px 20px" }}>
+                              {moduleList.length > 0 ? (
                                 <span
                                   style={{
                                     fontSize: "0.75rem",
-                                    color: "#16a34a",
-                                    fontWeight: 500,
-                                    backgroundColor: "#f0fdf4",
-                                    padding: "4px 10px",
-                                    borderRadius: 8,
+                                    color: "#6b7280",
                                   }}
                                 >
-                                  ✅ Processed
+                                  {moduleList.slice(0, 2).join(", ")}
+                                  {moduleList.length > 2 && (
+                                    <span style={{ color: "#3b82f6" }}>
+                                      {" "}
+                                      +{moduleList.length - 2} more
+                                    </span>
+                                  )}
                                 </span>
-                              )}
-                              {tab === "issues" && (
+                              ) : (
                                 <span
                                   style={{
                                     fontSize: "0.75rem",
-                                    color: "#ef4444",
-                                    fontWeight: 500,
-                                    backgroundColor: "#fef2f2",
-                                    padding: "4px 10px",
-                                    borderRadius: 8,
+                                    color: "#9ca3af",
                                   }}
                                 >
-                                  ❌ Rejected
+                                  —
                                 </span>
                               )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                            </td>
+                            <td style={{ padding: "14px 20px" }}>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  gap: 8,
+                                  flexWrap: "wrap",
+                                }}
+                              >
+                                <ActionBtn
+                                  onClick={() => setViewModal(req)}
+                                  color="#6b7280"
+                                  borderColor="#d1d5db"
+                                  bgColor="#fff"
+                                  label="👁 View"
+                                />
+                                {tab === "toProcess" && (
+                                  <>
+                                    <ActionBtn
+                                      onClick={() =>
+                                        openCommentModal(req, "done")
+                                      }
+                                      color="#16a34a"
+                                      borderColor="#4ade80"
+                                      bgColor="#fff"
+                                      label="✅ Mark Done"
+                                    />
+                                    <ActionBtn
+                                      onClick={() =>
+                                        openCommentModal(req, "issue")
+                                      }
+                                      color="#ef4444"
+                                      borderColor="#f87171"
+                                      bgColor="#fff"
+                                      label="❌ Flag Issue"
+                                    />
+                                    <ActionBtn
+                                      onClick={() =>
+                                        void handleTogglePriority(req.id)
+                                      }
+                                      color={
+                                        req.isPriority ? "#fff" : "#d97706"
+                                      }
+                                      borderColor="#f59e0b"
+                                      bgColor={
+                                        req.isPriority ? "#f59e0b" : "#fffbeb"
+                                      }
+                                      label={
+                                        req.isPriority
+                                          ? "★ Unpriority"
+                                          : "☆ Priority"
+                                      }
+                                    />
+                                  </>
+                                )}
+                                {tab === "done" && (
+                                  <span
+                                    style={{
+                                      fontSize: "0.75rem",
+                                      color: "#16a34a",
+                                      fontWeight: 500,
+                                      backgroundColor: "#f0fdf4",
+                                      padding: "4px 10px",
+                                      borderRadius: 8,
+                                    }}
+                                  >
+                                    ✅ Processed
+                                  </span>
+                                )}
+                                {tab === "issues" && (
+                                  <span
+                                    style={{
+                                      fontSize: "0.75rem",
+                                      color: "#ef4444",
+                                      fontWeight: 500,
+                                      backgroundColor: "#fef2f2",
+                                      padding: "4px 10px",
+                                      borderRadius: 8,
+                                    }}
+                                  >
+                                    ❌ Rejected
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </>
               )}
               {!loading && searchedCurrentList.length > 0 && (
@@ -1360,7 +1573,6 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
 
               return (
                 <>
-                  {/* Dark blue header */}
                   <div
                     style={{
                       backgroundColor: "#1e3a8a",
@@ -1402,11 +1614,9 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                     </button>
                   </div>
 
-                  {/* Scrollable body */}
                   <div
                     style={{ overflowY: "auto", flex: 1, padding: "20px 24px" }}
                   >
-                    {/* DOCUMENT INFO */}
                     <SectionHeader label="DOCUMENT INFO" />
                     <div
                       style={{
@@ -1450,7 +1660,6 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                       />
                     </div>
 
-                    {/* I. SYSTEM ACCESS */}
                     <SectionHeader label="I. SYSTEM ACCESS" />
                     <div
                       style={{
@@ -1478,7 +1687,6 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                       />
                     </div>
 
-                    {/* II. USER INFORMATION */}
                     <SectionHeader label="II. USER INFORMATION" />
                     <div
                       style={{
@@ -1520,7 +1728,6 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                       </div>
                     </div>
 
-                    {/* III. MODULES */}
                     {moduleList.length > 0 && (
                       <>
                         <SectionHeader label="III. MODULES" />
@@ -1552,7 +1759,6 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                       </>
                     )}
 
-                    {/* IV. APPROVAL TRAIL */}
                     <SectionHeader label="IV. APPROVAL TRAIL" />
                     <div
                       style={{
@@ -1669,19 +1875,18 @@ export default function Level4Dashboard({ admin, onLogout }: Props) {
                     </div>
                   </div>
 
-                  {/* Footer actions */}
-                <div
-                  style={{
-                    padding: "12px 24px",
-                    borderTop: "1px solid #e5e7eb",
-                    display: "flex",
-                    gap: 8,
-                    justifyContent: "flex-end",
-                    flexShrink: 0,
-                    backgroundColor: "#fff",
-                  }}
-                  className="flex-wrap sm:flex-nowrap"
-                >
+                  <div
+                    style={{
+                      padding: "12px 24px",
+                      borderTop: "1px solid #e5e7eb",
+                      display: "flex",
+                      gap: 8,
+                      justifyContent: "flex-end",
+                      flexShrink: 0,
+                      backgroundColor: "#fff",
+                    }}
+                    className="flex-wrap sm:flex-nowrap"
+                  >
                     {tab === "toProcess" && (
                       <>
                         <button
@@ -2149,11 +2354,13 @@ function ActionBtn({
   onClick,
   color,
   borderColor,
+  bgColor = "#fff",
   label,
 }: {
   onClick: () => void;
   color: string;
   borderColor: string;
+  bgColor?: string;
   label: string;
 }) {
   return (
@@ -2169,14 +2376,12 @@ function ActionBtn({
         border: `1px solid ${borderColor}`,
         borderRadius: 8,
         color,
-        background: "#fff",
+        background: bgColor,
         cursor: "pointer",
+        fontWeight: bgColor !== "#fff" ? 600 : 400,
       }}
     >
       {label}
     </button>
   );
 }
-
-
-
