@@ -72,5 +72,7 @@ model uaa_user_info {
   employee_id     String?
   contact_no      String?
   email           String?
+  supporting_document_name String?
+  supporting_document_url   String?
   uaa_submissions uaa_submissions? @relation(fields: [submission_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }

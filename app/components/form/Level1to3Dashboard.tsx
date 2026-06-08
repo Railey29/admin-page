@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 import type { CSSProperties } from "react";
 import { useState } from "react";
 import { AdminCredential } from "../../models/authModel";
@@ -1523,6 +1524,7 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                   overflow: "hidden",
                 }}
               >
+                {/* Modal Header */}
                 <div
                   style={{
                     backgroundColor: "#1e3a8a",
@@ -1562,9 +1564,11 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                   </button>
                 </div>
 
+                {/* Modal Body */}
                 <div
                   style={{ overflowY: "auto", padding: "20px 24px", flex: 1 }}
                 >
+                  {/* Document Info */}
                   <SectionTitle label="Document Info" />
                   <div
                     style={{
@@ -1609,6 +1613,7 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                     />
                   </div>
 
+                  {/* System Access */}
                   <SectionTitle label="I. System Access" />
                   <div
                     style={{
@@ -1633,6 +1638,7 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                     />
                   </div>
 
+                  {/* User Information */}
                   <SectionTitle label="II. User Information" />
                   <div
                     style={{
@@ -1671,6 +1677,21 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                     <InfoField label="Email" value={userInfo?.email ?? "—"} />
                   </div>
 
+                  {/* ── SUPPORTING DOCUMENT VIEWER ── */}
+                  {userInfo?.supporting_document_url && (
+                    <>
+                      <SectionTitle label="Supporting Document" />
+                      <SupportingDocumentViewer
+                        url={userInfo.supporting_document_url}
+                        name={
+                          userInfo.supporting_document_name ??
+                          "Uploaded document"
+                        }
+                      />
+                    </>
+                  )}
+
+                  {/* Modules */}
                   {modules?.selected_modules?.length > 0 && (
                     <>
                       <SectionTitle label="III. Modules" />
@@ -1703,6 +1724,7 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                     </>
                   )}
 
+                  {/* Approval Trail */}
                   <SectionTitle label="IV. Approval Trail" />
                   <div
                     style={{ display: "flex", flexDirection: "column", gap: 6 }}
@@ -1801,6 +1823,7 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
                   </div>
                 </div>
 
+                {/* Modal Footer */}
                 <div
                   style={{
                     padding: "12px 20px",
@@ -2213,6 +2236,223 @@ export default function Level1to3Dashboard({ admin, onLogout }: Props) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// SUPPORTING DOCUMENT VIEWER
+// Handles: images (jpg/jpeg/png/gif/webp/bmp/svg), PDF (iframe embed),
+// and any other file type (download-only fallback).
+// ══════════════════════════════════════════════════════════════════════
+
+function SupportingDocumentViewer({
+  url,
+  name,
+}: {
+  url: string;
+  name: string;
+}) {
+  const [pdfError, setPdfError] = useState(false);
+  const [imgError, setImgError] = useState(false);
+
+  // Extract extension from filename (UploadThing URLs don't contain the extension)
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  const isImage = ["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"].includes(
+    ext,
+  );
+  const isPdf = ext === "pdf";
+
+  return (
+    <div
+      style={{
+        marginBottom: 12,
+        border: "1px solid #e5e7eb",
+        borderRadius: 12,
+        backgroundColor: "#fafafa",
+        overflow: "hidden",
+      }}
+    >
+      {/* ── Header bar with filename + open link ── */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "10px 14px",
+          borderBottom: "1px solid #e5e7eb",
+          backgroundColor: "#f0f6fd",
+          gap: 10,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            minWidth: 0,
+          }}
+        >
+          <span style={{ fontSize: "1.1rem", flexShrink: 0 }}>
+            {isImage ? "🖼️" : isPdf ? "📄" : "📎"}
+          </span>
+          <span
+            style={{
+              fontSize: "0.8rem",
+              fontWeight: 600,
+              color: "#0c447c",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {name}
+          </span>
+        </div>
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            fontSize: "0.75rem",
+            fontWeight: 600,
+            color: "#1d4ed8",
+            textDecoration: "none",
+            whiteSpace: "nowrap",
+            flexShrink: 0,
+            padding: "4px 10px",
+            border: "1px solid #bfdbfe",
+            borderRadius: 6,
+            backgroundColor: "#eff6ff",
+          }}
+        >
+          ↗ Open in new tab
+        </a>
+      </div>
+
+      {/* ── Content area ── */}
+      <div style={{ padding: 14 }}>
+        {/* IMAGE */}
+        {isImage && !imgError && (
+          <a
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+            style={{ display: "block" }}
+            title="Click to open full size"
+          >
+            <img
+              src={url}
+              alt={name}
+              onError={() => setImgError(true)}
+              style={{
+                width: "100%",
+                maxHeight: 360,
+                objectFit: "contain",
+                borderRadius: 8,
+                border: "1px solid #e5e7eb",
+                backgroundColor: "#fff",
+                display: "block",
+                cursor: "zoom-in",
+              }}
+            />
+            <div
+              style={{
+                textAlign: "center",
+                marginTop: 6,
+                fontSize: "0.7rem",
+                color: "#9ca3af",
+              }}
+            >
+              Click image to open full size
+            </div>
+          </a>
+        )}
+
+        {/* IMAGE ERROR FALLBACK */}
+        {isImage && imgError && (
+          <DownloadFallback url={url} label="image" icon="🖼️" />
+        )}
+
+        {/* PDF — iframe embed */}
+        {isPdf && !pdfError && (
+          <iframe
+            src={url}
+            title={name}
+            onError={() => setPdfError(true)}
+            style={{
+              width: "100%",
+              height: 440,
+              border: "1px solid #e5e7eb",
+              borderRadius: 8,
+              backgroundColor: "#fff",
+              display: "block",
+            }}
+          />
+        )}
+
+        {/* PDF ERROR FALLBACK */}
+        {isPdf && pdfError && (
+          <DownloadFallback url={url} label="PDF" icon="📄" />
+        )}
+
+        {/* OTHER FILE TYPES */}
+        {!isImage && !isPdf && (
+          <DownloadFallback url={url} label="file" icon="📎" />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DownloadFallback({
+  url,
+  label,
+  icon,
+}: {
+  url: string;
+  label: string;
+  icon: string;
+}) {
+  return (
+    <div
+      style={{
+        textAlign: "center",
+        padding: "32px 16px",
+        color: "#6b7280",
+        fontSize: "0.85rem",
+      }}
+    >
+      <div style={{ fontSize: "2.5rem", marginBottom: 8 }}>{icon}</div>
+      <div style={{ marginBottom: 4, fontWeight: 500, color: "#374151" }}>
+        Preview not available
+      </div>
+      <div style={{ marginBottom: 16, fontSize: "0.78rem" }}>
+        This {label} cannot be previewed in the browser.
+      </div>
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        download
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "9px 20px",
+          backgroundColor: "#1e3a8a",
+          color: "#fff",
+          borderRadius: 8,
+          fontSize: "0.8rem",
+          fontWeight: 600,
+          textDecoration: "none",
+        }}
+      >
+        ⬇ Download {label}
+      </a>
     </div>
   );
 }

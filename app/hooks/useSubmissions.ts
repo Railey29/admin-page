@@ -23,6 +23,8 @@ export interface SubmissionRecord {
     employee_id: string | null;
     contact_no: string | null;
     email: string | null;
+    supporting_document_name: string | null;
+    supporting_document_url: string | null;
   }[];
   uaa_system_access: {
     account_type: string | null;
